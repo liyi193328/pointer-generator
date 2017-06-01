@@ -122,21 +122,20 @@ def setup_training(model, batcher):
   train_dir = os.path.join(FLAGS.log_root, "train")
   if not os.path.exists(train_dir): os.makedirs(train_dir)
 
-  default_device = tf.device('/cpu:0')
-  with default_device:
-    model.build_graph() # build the graph
-    if FLAGS.convert_to_coverage_model:
-      assert FLAGS.coverage, "To convert your non-coverage model to a coverage model, run with convert_to_coverage_model=True and coverage=True"
-      convert_to_coverage_model()
-    saver = tf.train.Saver(max_to_keep=1) # only keep 1 checkpoint at a time
+  
+  model.build_graph() # build the graph
+  if FLAGS.convert_to_coverage_model:
+    assert FLAGS.coverage, "To convert your non-coverage model to a coverage model, run with convert_to_coverage_model=True and coverage=True"
+    convert_to_coverage_model()
+  saver = tf.train.Saver(max_to_keep=1) # only keep 1 checkpoint at a time
 
   sv = tf.train.Supervisor(logdir=train_dir,
-                     is_chief=True,
-                     saver=saver,
-                     summary_op=None,
-                     save_summaries_secs=60, # save summaries for tensorboard every 60 secs
-                     save_model_secs=60, # checkpoint every 60 secs
-                     global_step=model.global_step)
+                   is_chief=True,
+                   saver=saver,
+                   summary_op=None,
+                   save_summaries_secs=60, # save summaries for tensorboard every 60 secs
+                   save_model_secs=60, # checkpoint every 60 secs
+                   global_step=model.global_step)
   summary_writer = sv.summary_writer
   tf.logging.info("Preparing or waiting for session...")
   sess_context_manager = sv.prepare_or_wait_for_session(config=util.get_config())
