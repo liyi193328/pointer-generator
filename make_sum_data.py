@@ -2,12 +2,16 @@
 
 import sys
 import os
+import six
+import click
 import codecs
 import hashlib
 import struct
 import subprocess
 import collections
+import multiprocessing as MP
 import tensorflow as tf
+import numpy as np
 from tensorflow.core.example import example_pb2
 
 import pyltp
@@ -15,65 +19,145 @@ LTP_DATA_DIR = "/home/bigdata/software/LTP/ltp_data"
 cws_model_path = os.path.join(LTP_DATA_DIR, 'cws.model')
 
 from pyltp import Segmentor
+from pyltp import SentenceSplitter
 segmentor = Segmentor()  # 初始化实例
 segmentor.load(cws_model_path)  # 加载模型
-words = segmentor.segment('元芳你怎么看')  # 分词
-print ("  ".join(words))
 
-def token_file(file_path, save_dir, save_name=None, delimiter="\t"):
-  base_name = os.path.basename(file_path)
-  if save_name == None:
-    save_name = base_name
-  save_path = os.path.join(save_dir, save_name)
-  fo = codecs.open(save_path, "w", "utf-8")
+
+# words = segmentor.segment('元芳你怎么看')  # 分词
+# print ("  ".join(words))
+
+PARA_TAG = "</para>"
+VOCAB_SIZE = 200000
+CHUNK_SIZE = 1000 # num examples per chunk, for the chunked data
+dm_single_close_quote = u'\u2019' # unicode
+dm_double_close_quote = u'\u201d'
+END_TOKENS = ['.', '!', '?', '...', "'", "`", '"', dm_single_close_quote, dm_double_close_quote, ")"] # acceptable ways to end a sentence
+
+# We use these to separate the summary sentences in the .bin datafiles
+SENTENCE_START = '<s>'
+SENTENCE_END = '</s>'
+
+# These are the number of .story files we expect there to be in cnn_stories_dir and dm_stories_dir
+num_expected_cnn_stories = 92579
+num_expected_dm_stories = 219506
+
+all_train_urls = "url_lists/all_train.txt"
+all_val_urls = "url_lists/all_val.txt"
+all_test_urls = "url_lists/all_test.txt"
+
+cnn_tokenized_stories_dir = "cnn_stories_tokenized"
+dm_tokenized_stories_dir = "dm_stories_tokenized"
+finished_files_dir = "finished_files"
+chunks_dir = os.path.join(finished_files_dir, "chunked")
+
+def token_file(file_path, token_path_or_handle, article_index = 2, delimiter="\t"):
+  save = False
+  if type(token_path_or_handle) == six.text_type:
+    fo = codecs.open(token_path_or_handle, "w", "utf-8")
+    save = True
+  else:
+    fo = token_path_or_handle
   all_lines = codecs.open(file_path, "r", "utf-8").readlines()
-  new_lines = []
   for i, line in enumerate(all_lines):
     t = line.strip().split(delimiter)
     new_line = []
-    for every_element in t:
-      tokens = segmentor.segment(every_element.strip())
+    for j, every_element in enumerate(t):
+      if j == article_index:
+        every_element = every_element.replace(PARA_TAG, "")
+      every_element = every_element.strip()
+      if every_element == "":
+        tokens = ""
+      else:
+        try:
+          tokens = segmentor.segment(every_element.encode('utf-8'))
+        except Exception:
+          print(line)
+          print(every_element)
+          import traceback
+          traceback.print_exc()
+          raise Exception()
       tokens_str = " ".join(tokens)
-      new_line.append(tokens)
-    line_str = "\t".join(new_line)
-    fo.write(line_str)
-  print("tokize {}, save to {}".format(file_path, save_path))
-  fo.close()
+      new_line.append(tokens_str)
+    line_str = "\t".join(new_line) + "\n"
+    fo.write(line_str.decode("utf-8"))
+  print("{} done".format(file_path))
+  if save:
+    print("tokenize {}, save to {}".format(file_path, token_path_or_handle))
 
-def preprocess_abs(abs):
+def token_file_or_dir(file_or_dir, token_path_or_dir, article_index = 2, delimiter="\t", filters="part-", pnums=MP.cpu_count() - 1):
+  if os.path.isdir(file_or_dir):
+    path_list = []
+    for i, filename in enumerate(os.listdir(file_or_dir)):
+      path = os.path.join(file_or_dir, filename)
+      if filters == None or filters in filename:
+        if os.path.isfile(path):
+          path_list.append(path)
+  else:
+    path_list = [file_or_dir]
+  print("will tokenize {} files: {}...".format(len(path_list), path_list[0:3]))
+  if os.path.isdir(token_path_or_dir):
+    print("will use {} pros to tokenize".format(pnums))
+    pool = MP.Pool(pnums)
+    pros = []
+    for i, file_path in enumerate(path_list):
+      token_path = os.path.join(token_path_or_dir, os.path.basename(file_path).split(".")[0] + ".token")
+      pro = pool.apply_async(token_file, args=(file_path, token_path,), kwds={"article_index":article_index,"delimiter":delimiter})
+      pros.append(pro)
+    for i, pro in enumerate(pros):
+      res = pro.get()
+  else:
+    save_path = token_path_or_dir
+    fo = codecs.open(save_path, "w", "utf-8")
+    for i, file_path in enumerate(path_list):
+      token_file(file_path, fo, article_index=article_index, delimiter=delimiter)
+    fo.close()
+
+def preprocess_abs_tokens(abs):
   try:
     abs = abs.split(u"：")[1]
   except Exception:
-    return abs
-def preprocess_article(article):
+    pass
+  if abs.strip() == "":
+    return False
+  try:
+    abs_sents = SentenceSplitter.split(abs)
+  except Exception:
+    print(abs)
+    raise  Exception()
+  abs = " ".join(" ".join([SENTENCE_START,sent, SENTENCE_END] for sent in abs_sents))
+  return abs
+
+def preprocess_article_tokens(article):
+  # article_sents = article.split("</para>")
+  if article.strip() == "":
+    return False
   return article
 
-def get_art_abs(line, delimeter="\t", abs_index=1, article_index=2):
+def get_article_abs(line, delimeter="\t", abs_index=1, article_index=2):
   eles = line.strip().split(delimeter)
   try:
     article, abs = eles[article_index], eles[abs_index]
   except IndexError:
     return [False, False]
-  article = preprocess_article(article)
-  abs = preprocess_abs(abs)
+  article = preprocess_article_tokens(article)
+  abs = preprocess_abs_tokens(abs)
   return [article, abs]
 
-def save_article_abs(tokenized_file_path, bin_path, text_path, abs_index=1, article_index=2, vocab_path=None, makevocab=False):
+def save_article_abs(lines, bin_path, text_path, abs_index=1, article_index=2, vocab_path=None, makevocab=False):
 
   if makevocab and vocab_path is None:
     raise  ValueError("make vocab must provide vocab_path")
 
-  f = codecs.open(tokenized_file_path, "r", "utf-8")
   writer = codecs.open(bin_path, "wb")
   ft = codecs.open(text_path, "w", "utf-8")
-  lines = f.readlines()
 
   if makevocab:
     vocab_counter = collections.Counter()
 
   for i, line in enumerate(lines):
     # Get the strings to write to .bin file
-    article, abstract = get_art_abs(line)
+    article, abstract = get_article_abs(line)
     if article == False:
       continue
     ft.write("\t".join([abstract,article]))
@@ -111,34 +195,33 @@ def save_article_abs(tokenized_file_path, bin_path, text_path, abs_index=1, arti
         writer.write(word + ' ' + str(count) + '\n')
     print("Finished writing vocab file")
 
-def
-dm_single_close_quote = u'\u2019' # unicode
-dm_double_close_quote = u'\u201d'
-END_TOKENS = ['.', '!', '?', '...', "'", "`", '"', dm_single_close_quote, dm_double_close_quote, ")"] # acceptable ways to end a sentence
+def make_bin_data(token_file_or_dir, bin_dir, vocab_dir, abs_index=1, article_index=2, ratios="0.8,0.1,0.1"):
+  from os.path import join
+  if os.path.exists(bin_dir) == False:
+    os.makedirs(bin_dir)
+  lines = []
+  if os.path.isdir(token_file_or_dir):
+    for filename in os.listdir(token_file_or_dir):
+      lines.extend(codecs.open(join(token_file_or_dir, filename), "r", "utf-8").readlines())
+  else:
+    lines = codecs.open(token_file_or_dir, "r", "utf-8").readlines()
+  ratio_list = [float(v) for v in ratios.split(",")]
+  assert  len(ratio_list) == 3, ratio_list
+  train_index = int(len(lines) * ratio_list[0])
+  dev_index = int( len(lines) * (ratio_list[0] + ratio_list[1]) )
+  test_index = int( len(lines) * np.sum(ratio_list) )
+  train_lines = lines[0 : train_index]
+  val_lines = lines[train_index : dev_index]
+  test_lines = lines[dev_index : test_index]
+  train_bin_path, vocab_path = join(bin_dir, "train.bin") , join(vocab_dir, "vocab.txt")
+  dev_bin_path = join(bin_dir, "val.bin")
+  test_bin_path = join(bin_dir, "test.bin")
+  save_article_abs(train_lines, train_bin_path, join(bin_dir, "train.txt"), makevocab=True, vocab_path=vocab_path)
+  save_article_abs(val_lines, dev_bin_path, join(bin_dir, "val.txt"))
+  save_article_abs(test_lines, test_bin_path, join(bin_dir, "test.txt"))
 
-# We use these to separate the summary sentences in the .bin datafiles
-SENTENCE_START = '<s>'
-SENTENCE_END = '</s>'
-
-all_train_urls = "url_lists/all_train.txt"
-all_val_urls = "url_lists/all_val.txt"
-all_test_urls = "url_lists/all_test.txt"
-
-cnn_tokenized_stories_dir = "cnn_stories_tokenized"
-dm_tokenized_stories_dir = "dm_stories_tokenized"
-finished_files_dir = "finished_files"
-chunks_dir = os.path.join(finished_files_dir, "chunked")
-
-# These are the number of .story files we expect there to be in cnn_stories_dir and dm_stories_dir
-num_expected_cnn_stories = 92579
-num_expected_dm_stories = 219506
-
-VOCAB_SIZE = 200000
-CHUNK_SIZE = 1000 # num examples per chunk, for the chunked data
-
-
-def chunk_file(set_name):
-  in_file = 'finished_files/%s.bin' % set_name
+def chunk_file(bin_path, chunks_dir, set_name):
+  in_file = bin_path
   reader = open(in_file, "rb")
   chunk = 0
   finished = False
@@ -156,16 +239,49 @@ def chunk_file(set_name):
         writer.write(struct.pack('%ds' % str_len, example_str))
       chunk += 1
 
-
-def chunk_all():
+def chunk_all(bin_dir, chunks_dir):
   # Make a dir to hold the chunks
   if not os.path.isdir(chunks_dir):
     os.mkdir(chunks_dir)
   # Chunk the data
   for set_name in ['train', 'val', 'test']:
-    print ("Splitting %s data into chunks..." % set_name)
-    chunk_file(set_name)
+    bin_path = os.path.join(bin_dir, "{}.bin".format(set_name))
+    print ("Splitting %s data into chunks..." % bin_path)
+    chunk_file(bin_path,chunks_dir, set_name)
   print ("Saved chunked data in %s" % chunks_dir)
+
+@click.command()
+@click.argument("source_path_or_dir")
+@click.argument("write_dir")
+@click.option("--token_dir_name", default="token", help="under {write_dir}/{token_dir_name} [None]")
+@click.option("--token_file_name", default=None, help="when source is file, must provide")
+@click.option("--abs_index", default=1, type=int, help="abstract index in one line[1]")
+@click.option("--article_index", default=2, type=int, help="article index in one line[2]")
+@click.option("--ratios", default="0.8,0.1,0.1", type=str, help="train:dev:test=0.8:0.1:0.1")
+def mak_sum_data(source_path_or_dir, write_dir, token_dir_name=None, token_file_name=None, abs_index=1, article_index=2, ratios="0.8,0.1,0.1"):
+  from os.path import join
+  if os.path.isdir(source_path_or_dir):
+    if token_dir_name is None:
+      assert token_file_name != None, "must provide tokenized_file_name when given dir"
+      token_path = join(write_dir, token_file_name + ".token")
+  else:
+    if token_file_name is None:
+      token_filename = os.path.basename(source_path_or_dir).split(".")[0]
+    token_path = join(write_dir, token_filename + ".token")
+
+  token_path_or_dir = None
+  if token_dir_name is not None:
+    token_path_or_dir = os.path.join(write_dir, token_dir_name)
+    if os.path.exists(token_path_or_dir) == False:
+      os.makedirs(token_path_or_dir)
+  else:
+    token_path_or_dir = token_path
+  bin_dir = join(write_dir, "bin")
+  chunks_dir = join(write_dir, "chunked")
+  vocab_path = join(write_dir, "vocab.txt")
+  # token_file_or_dir(source_path_or_dir, token_path_or_dir)
+  make_bin_data(token_path_or_dir, bin_dir, vocab_path, abs_index=abs_index, article_index=article_index, ratios=ratios)
+  chunk_all(bin_dir, chunks_dir)
 
 
 def tokenize_stories(stories_dir, tokenized_stories_dir):
@@ -319,7 +435,7 @@ def check_num_stories(stories_dir, num_expected):
     raise Exception("stories directory %s contains %i files but should contain %i" % (stories_dir, num_stories, num_expected))
 
 
-if __name__ == '__main__':
+def cnn_dayily_main():
   if len(sys.argv) != 3:
     print "USAGE: python make_datafiles.py <cnn_stories_dir> <dailymail_stories_dir>"
     sys.exit()
@@ -346,3 +462,7 @@ if __name__ == '__main__':
 
   # Chunk the data. This splits each of train.bin, val.bin and test.bin into smaller chunks, each containing e.g. 1000 examples, and saves them in finished_files/chunks
   chunk_all()
+
+if __name__ == '__main__':
+
+  mak_sum_data()
