@@ -16,7 +16,9 @@ import numpy as np
 from tensorflow.core.example import example_pb2
 
 import pyltp
-LTP_DATA_DIR = "/home/bigdata/software/LTP/ltp_data"
+
+
+LTP_DATA_DIR = os.environ.get("LTP_DATA_DIR","/home/bigdata/software/LTP/ltp_data")
 cws_model_path = os.path.join(LTP_DATA_DIR, 'cws.model')
 
 from pyltp import Segmentor
