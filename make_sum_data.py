@@ -7,6 +7,7 @@ import click
 import codecs
 import hashlib
 import struct
+import charset
 import subprocess
 import collections
 import multiprocessing as MP
@@ -33,6 +34,9 @@ CHUNK_SIZE = 1000 # num examples per chunk, for the chunked data
 dm_single_close_quote = u'\u2019' # unicode
 dm_double_close_quote = u'\u201d'
 END_TOKENS = ['.', '!', '?', '...', "'", "`", '"', dm_single_close_quote, dm_double_close_quote, ")"] # acceptable ways to end a sentence
+
+abs_filter_words = u"导读|导语|引导语|摘要|本文导读|小编导读|内容摘要|概述|小育导读|核心导读|内容提要|内容简介|文章导读|涂乐导读|小编导语|亿欧导读"
+filter_words = abs_filter_words.split("|")
 
 # We use these to separate the summary sentences in the .bin datafiles
 SENTENCE_START = '<s>'
@@ -70,7 +74,7 @@ def token_file(file_path, token_path_or_handle, article_index = 2, delimiter="\t
         tokens = ""
       else:
         try:
-          tokens = segmentor.segment(every_element.encode('utf-8'))
+          tokens = segmentor.segment(six.string_types(every_element))
         except Exception:
           print(line)
           print(every_element)
@@ -79,8 +83,8 @@ def token_file(file_path, token_path_or_handle, article_index = 2, delimiter="\t
           raise Exception()
       tokens_str = " ".join(tokens)
       new_line.append(tokens_str)
-    line_str = "\t".join(new_line) + "\n"
-    fo.write(line_str.decode("utf-8"))
+    line_str = delimiter.join(new_line) + "\n"
+    fo.write(six.text_type(line_str))
   print("{} done".format(file_path))
   if save:
     print("tokenize {}, save to {}".format(file_path, token_path_or_handle))
@@ -114,40 +118,66 @@ def token_file_or_dir(file_or_dir, token_path_or_dir, article_index = 2, delimit
     fo.close()
 
 def preprocess_abs_tokens(abs):
-  try:
-    abs = abs.split(u"：")[1]
-  except Exception:
-    pass
-  if abs.strip() == "":
+  pre_abs = ""
+  i = 0
+  for filter_word in filter_words:
+    if abs.startswith(filter_word) == True:
+      i = len(filter_word)
+      while charset.is_chinese(abs[i]) == False:
+        i += 1
+      break
+  pre_abs = abs[i:]
+  if pre_abs.strip() == "":
+    print("abs is emtpty")
     return False
+
   try:
-    abs_sents = SentenceSplitter.split(abs.encode("utf-8"))
+    abs_sents = SentenceSplitter.split(pre_abs.encode("utf-8"))
   except Exception:
     print(abs)
     import traceback
     traceback.print_exc()
     raise  Exception()
+
   new_abs_list = []
   for sent in abs_sents:
     sent_str = " ".join([SENTENCE_START, sent, SENTENCE_END])
     new_abs_list.append(sent_str)
-  abs = " ".join(new_abs_list)
-  return abs
+    pre_abs = " ".join(new_abs_list)
+
+  if isinstance(pre_abs, six.text_type) == False:
+    pre_abs = pre_abs.decode("utf-8")
+  return pre_abs
 
 def preprocess_article_tokens(article):
-  # article_sents = article.split("</para>")
   if article.strip() == "":
     return False
+  if isinstance(article, six.text_type) == False:
+    article = article.encode("utf-8")
   return article
 
 def get_article_abs(line, delimeter="\t", abs_index=1, article_index=2):
   eles = line.strip().split(delimeter)
   try:
-    article, abs = eles[article_index], eles[abs_index]
+    or_article, or_abs = eles[article_index], eles[abs_index]
   except IndexError:
+    print(line)
+    print("Index error")
+    print(len(eles))
     return [False, False]
-  article = preprocess_article_tokens(article)
-  abs = preprocess_abs_tokens(abs)
+  article = preprocess_article_tokens(or_article)
+  abs = preprocess_abs_tokens(or_abs)
+  stop = False
+  if article is False:
+    print("article is False")
+    print(or_article)
+    stop = True
+  if abs is False:
+    print("abs is False")
+    print(or_abs)
+    stop = True
+  if stop:
+    raise ValueError("qq")
   return [article, abs]
 
 def save_article_abs(lines, bin_path, text_path, abs_index=1, article_index=2, vocab_path=None, makevocab=False):
@@ -161,13 +191,17 @@ def save_article_abs(lines, bin_path, text_path, abs_index=1, article_index=2, v
   if makevocab:
     vocab_counter = collections.Counter()
 
+  valid_samples = 0
   for i, line in enumerate(lines):
     # Get the strings to write to .bin file
     article, abstract = get_article_abs(line)
-    if article == False:
+    if article == False or abstract == False:
       continue
-    art_abs_str = "\t".join([abstract, article])
-    ft.write("\t".join([abstract,article]))
+    art_abs_str = "\t".join([abstract, article]) + "\n"
+    ft.write(six.text_type(art_abs_str))
+
+    article = article.encode("utf-8")
+    abstract = abstract.encode("utf-8")
 
     # Write to tf.Example
     tf_example = example_pb2.Example()
@@ -178,6 +212,7 @@ def save_article_abs(lines, bin_path, text_path, abs_index=1, article_index=2, v
     writer.write(struct.pack('q', str_len))
     writer.write(struct.pack('%ds' % str_len, tf_example_str))
 
+    valid_samples += 1
     # Write the vocab to file, if applicable
     if makevocab:
       art_tokens = article.split(' ')
@@ -190,22 +225,25 @@ def save_article_abs(lines, bin_path, text_path, abs_index=1, article_index=2, v
 
   ft.close()
   writer.close()
-
-  print("Finished all articles and abs writing bin file %s\n" % bin_path)
-  print("write text articles and abs to {}".format(text_path))
+  print("have {} samples".format(valid_samples))
+  print("Finished all articles and abs writing bin file %s" % bin_path)
+  print("write text articles and abs to {}\n".format(text_path))
 
   # write vocab to file
   if makevocab:
     print("Writing vocab file...")
     with codecs.open(vocab_path, 'w', "utf-8") as writer:
       for word, count in vocab_counter.most_common(VOCAB_SIZE):
-        writer.write(word + ' ' + str(count) + '\n')
+        s = word + ' ' + str(count) + '\n'
+        writer.write(s.decode("utf-8"))
     print("Finished writing vocab file")
 
 def make_bin_data(token_file_or_dir, bin_dir, vocab_dir, abs_index=1, article_index=2, ratios="0.8,0.1,0.1"):
   from os.path import join
   if os.path.exists(bin_dir) == False:
     os.makedirs(bin_dir)
+  if os.path.exists(vocab_dir) == False:
+    os.makedirs(vocab_dir)
   lines = []
   if os.path.isdir(token_file_or_dir):
     for filename in os.listdir(token_file_or_dir):
@@ -285,7 +323,7 @@ def mak_sum_data(source_path_or_dir, write_dir, token_dir_name=None, token_file_
     token_path_or_dir = token_path
   bin_dir = join(write_dir, "bin")
   chunks_dir = join(write_dir, "chunked")
-  vocab_path = join(write_dir, "vocab.txt")
+  vocab_path = join(write_dir, "vocab")
   # token_file_or_dir(source_path_or_dir, token_path_or_dir)
   make_bin_data(token_path_or_dir, bin_dir, vocab_path, abs_index=abs_index, article_index=article_index, ratios=ratios)
   chunk_all(bin_dir, chunks_dir)
