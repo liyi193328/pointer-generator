@@ -121,11 +121,17 @@ def preprocess_abs_tokens(abs):
   if abs.strip() == "":
     return False
   try:
-    abs_sents = SentenceSplitter.split(abs)
+    abs_sents = SentenceSplitter.split(abs.encode("utf-8"))
   except Exception:
     print(abs)
+    import traceback
+    traceback.print_exc()
     raise  Exception()
-  abs = " ".join(" ".join([SENTENCE_START,sent, SENTENCE_END] for sent in abs_sents))
+  new_abs_list = []
+  for sent in abs_sents:
+    sent_str = " ".join([SENTENCE_START, sent, SENTENCE_END])
+    new_abs_list.append(sent_str)
+  abs = " ".join(new_abs_list)
   return abs
 
 def preprocess_article_tokens(article):
@@ -160,6 +166,7 @@ def save_article_abs(lines, bin_path, text_path, abs_index=1, article_index=2, v
     article, abstract = get_article_abs(line)
     if article == False:
       continue
+    art_abs_str = "\t".join([abstract, article])
     ft.write("\t".join([abstract,article]))
 
     # Write to tf.Example
