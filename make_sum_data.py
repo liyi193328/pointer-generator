@@ -416,7 +416,7 @@ def get_art_abs(file):
 
 def write_to_bin(url_file, out_file, makevocab=False):
   """Reads the tokenized .story files corresponding to the urls listed in the url_file and writes them to a out_file."""
-  print "Making bin file for URLs listed in %s..." % url_file
+  print ("Making bin file for URLs listed in %s..." % url_file)
   url_list = read_text_file(url_file)
   url_hashes = get_url_hashes(url_list)
   story_fnames = [s+".story" for s in url_hashes]
@@ -428,7 +428,7 @@ def write_to_bin(url_file, out_file, makevocab=False):
   with open(out_file, 'wb') as writer:
     for idx,s in enumerate(story_fnames):
       if idx % 1000 == 0:
-        print "Writing story %i of %i; %.2f percent done" % (idx, num_stories, float(idx)*100.0/float(num_stories))
+        print ("Writing story %i of %i; %.2f percent done" % (idx, num_stories, float(idx)*100.0/float(num_stories)))
 
       # Look in the tokenized story dirs to find the .story file corresponding to this url
       if os.path.isfile(os.path.join(cnn_tokenized_stories_dir, s)):
@@ -436,9 +436,9 @@ def write_to_bin(url_file, out_file, makevocab=False):
       elif os.path.isfile(os.path.join(dm_tokenized_stories_dir, s)):
         story_file = os.path.join(dm_tokenized_stories_dir, s)
       else:
-        print "Error: Couldn't find tokenized story file %s in either tokenized story directories %s and %s. Was there an error during tokenization?" % (s, cnn_tokenized_stories_dir, dm_tokenized_stories_dir)
+        print ("Error: Couldn't find tokenized story file %s in either tokenized story directories %s and %s. Was there an error during tokenization?" % (s, cnn_tokenized_stories_dir, dm_tokenized_stories_dir))
         # Check again if tokenized stories directories contain correct number of files
-        print "Checking that the tokenized stories directories %s and %s contain correct number of files..." % (cnn_tokenized_stories_dir, dm_tokenized_stories_dir)
+        print ("Checking that the tokenized stories directories %s and %s contain correct number of files..." % (cnn_tokenized_stories_dir, dm_tokenized_stories_dir))
         check_num_stories(cnn_tokenized_stories_dir, num_expected_cnn_stories)
         check_num_stories(dm_tokenized_stories_dir, num_expected_dm_stories)
         raise Exception("Tokenized stories directories %s and %s contain correct number of files but story file %s found in neither." % (cnn_tokenized_stories_dir, dm_tokenized_stories_dir, s))
@@ -465,11 +465,11 @@ def write_to_bin(url_file, out_file, makevocab=False):
         tokens = [t for t in tokens if t!=""] # remove empty
         vocab_counter.update(tokens)
 
-  print "Finished writing file %s\n" % out_file
+  print ("Finished writing file %s\n" % out_file)
 
   # write vocab to file
   if makevocab:
-    print "Writing vocab file..."
+    print ("Writing vocab file...")
     with open(os.path.join(finished_files_dir, "vocab"), 'w') as writer:
       for word, count in vocab_counter.most_common(VOCAB_SIZE):
         writer.write(word + ' ' + str(count) + '\n')
@@ -484,7 +484,7 @@ def check_num_stories(stories_dir, num_expected):
 
 def cnn_dayily_main():
   if len(sys.argv) != 3:
-    print "USAGE: python make_datafiles.py <cnn_stories_dir> <dailymail_stories_dir>"
+    print ("USAGE: python make_datafiles.py <cnn_stories_dir> <dailymail_stories_dir>")
     sys.exit()
   cnn_stories_dir = sys.argv[1]
   dm_stories_dir = sys.argv[2]
