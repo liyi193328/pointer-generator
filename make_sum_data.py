@@ -217,6 +217,9 @@ def save_article_abs(lines, bin_path, text_path, abs_index=1, article_index=2, v
     valid_samples += 1
     # Write the vocab to file, if applicable
     if makevocab:
+      if sys.version_info[0] == 3:
+        article = article.decode("utf-8")
+        abstract = abstract.decode("utf-8")
       art_tokens = article.split(' ')
       abs_tokens = abstract.split(' ')
       abs_tokens = [t for t in abs_tokens if t not in [SENTENCE_START, SENTENCE_END]]  # remove these tags from vocab
@@ -326,7 +329,7 @@ def mak_sum_data(source_path_or_dir, write_dir, token_dir_name=None, token_file_
   bin_dir = join(write_dir, "bin")
   chunks_dir = join(write_dir, "chunked")
   vocab_path = join(write_dir, "vocab")
-  token_file_or_dir(source_path_or_dir, token_path_or_dir)
+  # token_file_or_dir(source_path_or_dir, token_path_or_dir)
   make_bin_data(token_path_or_dir, bin_dir, vocab_path, abs_index=abs_index, article_index=article_index, ratios=ratios)
   chunk_all(bin_dir, chunks_dir)
 
