@@ -240,7 +240,9 @@ def save_article_abs(lines, bin_path, text_path, abs_index=1, article_index=2, v
     with codecs.open(vocab_path, 'w', "utf-8") as writer:
       for word, count in vocab_counter.most_common(VOCAB_SIZE):
         s = word + ' ' + str(count) + '\n'
-        writer.write(s.decode("utf-8"))
+        if sys.version_info[0] == 2:
+          s = s.decode("utf-8")
+        writer.write(s)
     print("Finished writing vocab file")
 
 def make_bin_data(token_file_or_dir, bin_dir, vocab_dir, abs_index=1, article_index=2, ratios="0.8,0.1,0.1"):
