@@ -76,7 +76,7 @@ def token_file(file_path, token_path_or_handle, article_index = 2, delimiter="\t
         tokens = ""
       else:
         try:
-          tokens = segmentor.segment(six.string_types(every_element))
+          tokens = segmentor.segment(every_element.encode("utf-8"))
         except Exception:
           print(line)
           print(every_element)
@@ -326,7 +326,7 @@ def mak_sum_data(source_path_or_dir, write_dir, token_dir_name=None, token_file_
   bin_dir = join(write_dir, "bin")
   chunks_dir = join(write_dir, "chunked")
   vocab_path = join(write_dir, "vocab")
-  # token_file_or_dir(source_path_or_dir, token_path_or_dir)
+  token_file_or_dir(source_path_or_dir, token_path_or_dir)
   make_bin_data(token_path_or_dir, bin_dir, vocab_path, abs_index=abs_index, article_index=article_index, ratios=ratios)
   chunk_all(bin_dir, chunks_dir)
 
