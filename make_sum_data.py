@@ -473,7 +473,7 @@ def write_to_bin(url_file, out_file, makevocab=False):
     with open(os.path.join(finished_files_dir, "vocab"), 'w') as writer:
       for word, count in vocab_counter.most_common(VOCAB_SIZE):
         writer.write(word + ' ' + str(count) + '\n')
-    print "Finished writing vocab file"
+    print ("Finished writing vocab file")
 
 
 def check_num_stories(stories_dir, num_expected):
