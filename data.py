@@ -106,13 +106,7 @@ class Vocab(object):
       writer = csv.DictWriter(f, delimiter="\t", fieldnames=fieldnames)
       for i in range(self.size()):
         word = self._id_to_word[i]
-        print(word)
-        print(type(word))
-        # f.write(word)
-        xd = {"word": self._id_to_word[i]}
-        xd = dict((k, v.encode('utf-8') if isinstance(v, six.string_types) else v) for k, v in xd.items())
-        writer.writerow(xd)
-        print("\n")
+        f.write(word+"\n")
 
 
 def example_generator(data_path, single_pass):
