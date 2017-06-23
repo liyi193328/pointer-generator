@@ -15,8 +15,10 @@
 # ==============================================================================
 
 """This file contains code to process data into batches"""
-
-import queue
+try:
+  import queue
+except ImportError:
+  import Queue as queue
 from random import shuffle
 from threading import Thread
 import time
