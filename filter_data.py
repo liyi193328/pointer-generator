@@ -36,6 +36,7 @@ def filter_stat(path, stat_path, save_path, label_index=None, title_index=1, abs
   total_abs_sent_num , cov_abs_sent_num = 0 , 0
   cov_skip_abs = 0
   i = 0
+  no_label_num = 0
   while True:
     line = fin.readline()
     if not line:
@@ -61,6 +62,8 @@ def filter_stat(path, stat_path, save_path, label_index=None, title_index=1, abs
     for sent in abs_sents:
       if sent in article:
         cov_num += 1
+    if label is not None and "null" in label:
+      no_label_num +=1
     cov_abs_sent_num += cov_num
     if len(abs_sents) == cov_num or cov_num > abs_max_cov_sents:
       cov_skip_abs += 1
@@ -69,10 +72,12 @@ def filter_stat(path, stat_path, save_path, label_index=None, title_index=1, abs
       use_samples += 1
       fo.write("\t".join([title, abstract, article]) + "\n")
 
-  print("have-label:all = {}:{}".format(use_samples, i))
+  print("skip {} docs with high coverage in article".format(cov_skip_abs))
+  print("{} docs have no label".format(no_label_num))
+  print("use:all = {}:{}".format(use_samples, i))
   print("abs-cov:all = {}:{}".format(cov_abs_sent_num, total_abs_sent_num))
   len_df = pd.DataFrame(len_stat, columns=["art_len", "abs_len"])
-  len_df.describe()
+  print(len_df.describe())
   len_df.to_csv(stat_path, index=False)
 
   fo.close()
