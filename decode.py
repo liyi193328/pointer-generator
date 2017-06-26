@@ -25,6 +25,7 @@ import json
 import pyrouge
 import util
 import logging
+import codecs
 import numpy as np
 
 FLAGS = tf.app.flags.FLAGS
@@ -72,6 +73,8 @@ class BeamSearchDecoder(object):
       if not os.path.exists(self._rouge_ref_dir): os.mkdir(self._rouge_ref_dir)
       self._rouge_dec_dir = os.path.join(self._decode_dir, "decoded")
       if not os.path.exists(self._rouge_dec_dir): os.mkdir(self._rouge_dec_dir)
+      self._article_with_gen_abs_dir = os.path.join(self._decode_dir, "art_decoded")
+      if not os.path.exists(self._article_with_gen_abs_dir): os.makedirs(self._article_with_gen_abs_dir)
 
 
   def decode(self):
@@ -111,7 +114,7 @@ class BeamSearchDecoder(object):
       decoded_output = ' '.join(decoded_words) # single string
 
       if FLAGS.single_pass:
-        self.write_for_rouge(original_abstract_sents, decoded_words, counter) # write ref summary and decoded summary to file, to eval with pyrouge later
+        self.write_for_rouge(original_abstract_sents, decoded_words, counter, article=original_article) # write ref summary and decoded summary to file, to eval with pyrouge later
         counter += 1 # this is how many examples we've decoded
       else:
         print_results(article_withunks, abstract_withunks, decoded_output) # log output to screen
@@ -124,7 +127,7 @@ class BeamSearchDecoder(object):
           _ = util.load_ckpt(self._saver, self._sess)
           t0 = time.time()
 
-  def write_for_rouge(self, reference_sents, decoded_words, ex_index):
+  def write_for_rouge(self, reference_sents, decoded_words, ex_index, article=None):
     """Write output to file in correct format for eval with pyrouge. This is called in single_pass mode.
 
     Args:
@@ -151,13 +154,25 @@ class BeamSearchDecoder(object):
     # Write to file
     ref_file = os.path.join(self._rouge_ref_dir, "%06d_reference.txt" % ex_index)
     decoded_file = os.path.join(self._rouge_dec_dir, "%06d_decoded.txt" % ex_index)
+    article_with_gen_abs_file = os.path.join(self._article_with_gen_abs_dir, "%06d_article_decoded.txt" % ex_index)
 
-    with open(ref_file, "w") as f:
+    if article is not None:
+      with codecs.open(article_with_gen_abs_file, "w", "utf-8") as f:
+        f.write(article + "\n")
+        f.write("\n")
+        for idx, sent in enumerate(reference_sents):
+          f.write(sent + "\n")
+        f.write("\n")
+        for idx, sent in enumerate(decoded_sents):
+          f.write(sent) if idx == len(decoded_sents) - 1 else f.write(sent + "\n")
+
+    with codecs.open(ref_file, "w", "utf-8") as f:
       for idx,sent in enumerate(reference_sents):
         f.write(sent) if idx==len(reference_sents)-1 else f.write(sent+"\n")
-    with open(decoded_file, "w") as f:
+    with codecs.open(decoded_file, "w", "utf-8") as f:
       for idx,sent in enumerate(decoded_sents):
         f.write(sent) if idx==len(decoded_sents)-1 else f.write(sent+"\n")
+
 
     tf.logging.info("Wrote example %i to file" % ex_index)
 
