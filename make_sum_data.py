@@ -65,7 +65,7 @@ def preprocess_abs_text(abs_text):
       i = len(filter_word)
       if i >= len(abs_text):
         return ""
-      while charset.is_chinese(abs_text[i]) == False:
+      while i < len(abs_text) and not charset.is_chinese(abs_text[i]):
         i += 1
       break
   return abs_text[i:]
