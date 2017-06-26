@@ -48,7 +48,7 @@ def filter_stat(path, stat_path, save_path, label_index=0, title_index=1, abs_in
     try:
       label = None
       if label_index is not None:
-        label = t[label]
+        label = t[label_index]
       title = t[title_index]
       abstract = t[abs_index]
       article = t[article_index]
