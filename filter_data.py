@@ -34,7 +34,7 @@ def filter_stat(path, stat_path, save_path=None, label_index=None, title_index=1
   lines = codecs.open(path, "r", "utf-8").readlines()
   fo = codecs.open(save_path, "w", "utf-8")
   total_abs_sent_num , cov_abs_sent_num = 0 , 0
-  cov_skip_abs =
+  cov_skip_abs = 0
   for line in lines:
     t = line.strip().split("\t")
     try:
