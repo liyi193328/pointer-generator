@@ -24,11 +24,11 @@ def write_list_to_file(d, file_path, verb=True):
 @click.command()
 @click.argument("path")
 @click.argument("stat_path")
-@click.option("--save_path", type=str, default=None, help="if none, only stat, else filter null label, save to the path")
+@click.argument("save_path", type=str)
 @click.option("--title_index", type=int, default=1, help="title index in one line[1]")
 @click.option("--abs_index", type=int, default=2, help="abs index in one line[1]")
 @click.option("--article_index", type=int, default=3, help="article index in one line[1]")
-def filter_stat(path, stat_path, save_path=None, label_index=None, title_index=1, abs_index=2, article_index=3, abs_max_cov_sents=1):
+def filter_stat(path, stat_path, save_path, label_index=None, title_index=1, abs_index=2, article_index=3, abs_max_cov_sents=1):
   len_stat = []
   use_samples =  0
   lines = codecs.open(path, "r", "utf-8").readlines()
@@ -66,7 +66,7 @@ def filter_stat(path, stat_path, save_path=None, label_index=None, title_index=1
   print("abs-cov:all = {}:{}".format(cov_abs_sent_num, total_abs_sent_num))
   len_df = pd.DataFrame(len_stat, columns=["art_len", "abs_len"])
   len_df.describe()
-  len_df.to_csv(save_path, index=False)
+  len_df.to_csv(stat_path, index=False)
 
   fo.close()
 if __name__ == "__main__":
