@@ -27,6 +27,7 @@ import util
 import logging
 import codecs
 import numpy as np
+from pyltp import SentenceSplitter
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -145,6 +146,9 @@ class BeamSearchDecoder(object):
       sent = decoded_words[:fst_period_idx+1] # sentence up to and including the period
       decoded_words = decoded_words[fst_period_idx+1:] # everything else
       decoded_sents.append(' '.join(sent))
+
+    decoded_text = "".join(decoded_sents)
+    decoded_sents = SentenceSplitter.split(decoded_text.encode("utf-8"))
 
     # pyrouge calls a perl script that puts the data into HTML files.
     # Therefore we need to make our output HTML safe.

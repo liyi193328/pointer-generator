@@ -57,7 +57,19 @@ dm_tokenized_stories_dir = "dm_stories_tokenized"
 finished_files_dir = "finished_files"
 chunks_dir = os.path.join(finished_files_dir, "chunked")
 
-def token_file(file_path, token_path_or_handle, article_index = 2, delimiter="\t"):
+
+def preprocess_abs_text(abs_text):
+  i = 0
+  for filter_word in filter_words:
+    if abs_text.startswith(filter_word) == True:
+      i = len(filter_word)
+      while charset.is_chinese(abs_text[i]) == False:
+        i += 1
+      break
+  return abs_text[i:]
+
+
+def token_file(file_path, token_path_or_handle, abs_index=1, article_index=2, delimiter="\t"):
   save = False
   if type(token_path_or_handle) == six.text_type:
     fo = codecs.open(token_path_or_handle, "w", "utf-8")
@@ -71,6 +83,8 @@ def token_file(file_path, token_path_or_handle, article_index = 2, delimiter="\t
     for j, every_element in enumerate(t):
       if j == article_index:
         every_element = every_element.replace(PARA_TAG, "")
+      if j == abs_index:
+        every_element = preprocess_abs_text(every_element)
       every_element = every_element.strip()
       if every_element == "":
         tokens = ""
@@ -119,16 +133,10 @@ def token_file_or_dir(file_or_dir, token_path_or_dir, article_index = 2, delimit
       token_file(file_path, fo, article_index=article_index, delimiter=delimiter)
     fo.close()
 
-def preprocess_abs_tokens(abs):
-  pre_abs = ""
-  i = 0
-  for filter_word in filter_words:
-    if abs.startswith(filter_word) == True:
-      i = len(filter_word)
-      while charset.is_chinese(abs[i]) == False:
-        i += 1
-      break
-  pre_abs = abs[i:]
+def preprocess_abs_tokens(abs, article=None, max_substring_sents=0):
+
+  pre_abs = abs
+
   if pre_abs.strip() == "":
     print("abs is emtpty")
     return False
@@ -142,7 +150,12 @@ def preprocess_abs_tokens(abs):
     raise  Exception()
 
   new_abs_list = []
+  substring_sents = 0
   for sent in abs_sents:
+    if article is not None and sent in article:
+      substring_sents += 1
+    if substring_sents > max_substring_sents:
+      return False
     sent_str = " ".join([SENTENCE_START, sent, SENTENCE_END])
     new_abs_list.append(sent_str)
     pre_abs = " ".join(new_abs_list)
@@ -151,11 +164,16 @@ def preprocess_abs_tokens(abs):
     pre_abs = pre_abs.decode("utf-8")
   return pre_abs
 
-def preprocess_article_tokens(article):
+def preprocess_article_tokens(article, min_tokens=300, max_tokens=None, token_split=" "):
   if article.strip() == "":
     return False
   if isinstance(article, six.text_type) == False:
     article = article.encode("utf-8")
+  tokens = article.split(token_split)
+  if len(tokens) < min_tokens:
+    return False
+  if max_tokens is not None and len(tokens) > max_tokens:
+    return False
   return article
 
 def get_article_abs(line, delimeter="\t", abs_index=1, article_index=2):
@@ -178,8 +196,6 @@ def get_article_abs(line, delimeter="\t", abs_index=1, article_index=2):
     print("abs is False")
     print(or_abs)
     stop = True
-  if stop:
-    raise ValueError("qq")
   return [article, abs]
 
 def save_article_abs(lines, bin_path, text_path, abs_index=1, article_index=2, vocab_path=None, makevocab=False):
@@ -331,7 +347,7 @@ def mak_sum_data(source_path_or_dir, write_dir, token_dir_name=None, token_file_
   bin_dir = join(write_dir, "bin")
   chunks_dir = join(write_dir, "chunked")
   vocab_path = join(write_dir, "vocab")
-  # token_file_or_dir(source_path_or_dir, token_path_or_dir)
+  token_file_or_dir(source_path_or_dir, token_path_or_dir)
   make_bin_data(token_path_or_dir, bin_dir, vocab_path, abs_index=abs_index, article_index=article_index, ratios=ratios)
   chunk_all(bin_dir, chunks_dir)
 
