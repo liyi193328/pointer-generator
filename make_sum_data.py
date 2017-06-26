@@ -135,7 +135,7 @@ def token_file_or_dir(file_or_dir, token_path_or_dir, article_index = 2, delimit
       token_file(file_path, fo, article_index=article_index, delimiter=delimiter)
     fo.close()
 
-def preprocess_abs_tokens(abs, article=None, max_substring_sents=0):
+def preprocess_abs_tokens(abs, article=None, max_substring_sents=1):
 
   pre_abs = abs
 
@@ -166,7 +166,7 @@ def preprocess_abs_tokens(abs, article=None, max_substring_sents=0):
     pre_abs = pre_abs.decode("utf-8")
   return pre_abs
 
-def preprocess_article_tokens(article, min_tokens=300, max_tokens=None, token_split=" "):
+def preprocess_article_tokens(article, min_tokens=200, max_tokens=None, token_split=" "):
   if article.strip() == "":
     return False
   if isinstance(article, six.text_type) == False:
@@ -328,7 +328,8 @@ def chunk_all(bin_dir, chunks_dir):
 @click.option("--abs_index", default=1, type=int, help="abstract index in one line[1]")
 @click.option("--article_index", default=2, type=int, help="article index in one line[2]")
 @click.option("--ratios", default="0.8,0.1,0.1", type=str, help="train:dev:test=0.8:0.1:0.1")
-def mak_sum_data(source_path_or_dir, write_dir, token_dir_name=None, token_file_name=None, abs_index=1, article_index=2, ratios="0.8,0.1,0.1"):
+@click.option("--tokenized", is_flag=True, help="if set, don't tokenize")
+def mak_sum_data(source_path_or_dir, write_dir, tokenized=True, token_dir_name=None, token_file_name=None, abs_index=1, article_index=2, ratios="0.8,0.1,0.1"):
   from os.path import join
   if os.path.isdir(source_path_or_dir):
     if token_dir_name is None:
@@ -349,7 +350,8 @@ def mak_sum_data(source_path_or_dir, write_dir, token_dir_name=None, token_file_
   bin_dir = join(write_dir, "bin")
   chunks_dir = join(write_dir, "chunked")
   vocab_path = join(write_dir, "vocab")
-  token_file_or_dir(source_path_or_dir, token_path_or_dir)
+  if not tokenized:
+    token_file_or_dir(source_path_or_dir, token_path_or_dir)
   make_bin_data(token_path_or_dir, bin_dir, vocab_path, abs_index=abs_index, article_index=article_index, ratios=ratios)
   chunk_all(bin_dir, chunks_dir)
 
