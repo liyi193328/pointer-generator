@@ -107,7 +107,7 @@ def token_file(file_path, token_path_or_handle, abs_index=1, article_index=2, de
   if save:
     print("tokenize {}, save to {}".format(file_path, token_path_or_handle))
 
-def token_file_or_dir(file_or_dir, token_path_or_dir, article_index = 2, delimiter="\t", filters="part-", pnums=MP.cpu_count() - 1):
+def token_file_or_dir(file_or_dir, token_path_or_dir, article_index = 2, delimiter="\t", filters=None, pnums=MP.cpu_count() - 1):
   if os.path.isdir(file_or_dir):
     path_list = []
     for i, filename in enumerate(os.listdir(file_or_dir)):
