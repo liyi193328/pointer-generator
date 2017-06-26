@@ -31,11 +31,18 @@ def write_list_to_file(d, file_path, verb=True):
 def filter_stat(path, stat_path, save_path, label_index=None, title_index=1, abs_index=2, article_index=3, abs_max_cov_sents=1):
   len_stat = []
   use_samples =  0
-  lines = codecs.open(path, "r", "utf-8").readlines()
+  fin = codecs.open(path, "r", "utf-8")
   fo = codecs.open(save_path, "w", "utf-8")
   total_abs_sent_num , cov_abs_sent_num = 0 , 0
   cov_skip_abs = 0
-  for line in lines:
+  i = 0
+  while True:
+    line = fin.readline()
+    if not line:
+      break
+    if (i+1) % int(1e4) == 0:
+      print("finished {}...".format(i))
+    i += 1
     t = line.strip().split("\t")
     try:
       label = None
@@ -62,7 +69,7 @@ def filter_stat(path, stat_path, save_path, label_index=None, title_index=1, abs
       use_samples += 1
       fo.write("\t".join([title, abstract, article]) + "\n")
 
-  print("have-label:all = {}:{}".format(use_samples, len(lines)))
+  print("have-label:all = {}:{}".format(use_samples, i))
   print("abs-cov:all = {}:{}".format(cov_abs_sent_num, total_abs_sent_num))
   len_df = pd.DataFrame(len_stat, columns=["art_len", "abs_len"])
   len_df.describe()
