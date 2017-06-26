@@ -28,7 +28,7 @@ def write_list_to_file(d, file_path, verb=True):
 @click.option("--title_index", type=int, default=1, help="title index in one line[1]")
 @click.option("--abs_index", type=int, default=2, help="abs index in one line[1]")
 @click.option("--article_index", type=int, default=3, help="article index in one line[1]")
-def filter_stat(path, stat_path, save_path, label_index=None, title_index=1, abs_index=2, article_index=3, abs_max_cov_sents=1):
+def filter_stat(path, stat_path, save_path, label_index=0, title_index=1, abs_index=2, article_index=3, abs_max_cov_sents=1):
   len_stat = []
   use_samples =  0
   fin = codecs.open(path, "r", "utf-8")
