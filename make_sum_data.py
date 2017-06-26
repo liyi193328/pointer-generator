@@ -324,7 +324,7 @@ def chunk_all(bin_dir, chunks_dir):
 @click.argument("source_path_or_dir")
 @click.argument("write_dir")
 @click.option("--token_dir_name", default="token", help="under {write_dir}/{token_dir_name} [None]")
-@click.option("--token_file_name", default=None, help="when source is file, must provide")
+@click.option("--token_file_name", default=None, help="when source is file, must provide(suffix may not .token")
 @click.option("--abs_index", default=1, type=int, help="abstract index in one line[1]")
 @click.option("--article_index", default=2, type=int, help="article index in one line[2]")
 @click.option("--ratios", default="0.8,0.1,0.1", type=str, help="train:dev:test=0.8:0.1:0.1")
@@ -336,8 +336,8 @@ def mak_sum_data(source_path_or_dir, write_dir, token_dir_name=None, token_file_
       token_path = join(write_dir, token_file_name + ".token")
   else:
     if token_file_name is None:
-      token_filename = os.path.basename(source_path_or_dir).split(".")[0]
-    token_path = join(write_dir, token_filename + ".token")
+      token_file_name = os.path.basename(source_path_or_dir).split(".")[0]
+    token_path = join(write_dir, token_file_name + ".token")
 
   token_path_or_dir = None
   if token_dir_name is not None:
