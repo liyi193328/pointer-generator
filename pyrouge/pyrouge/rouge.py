@@ -1,3 +1,6 @@
+
+from __future__ import print_function
+
 import codecs
 from collections import defaultdict
 import shutil
