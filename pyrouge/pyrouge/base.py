@@ -1,7 +1,12 @@
-from os.path import dirname
-from pathlib import Path
 
-ROUGE_EVAL_HOME = str(Path(dirname(__file__)) / '../tools/ROUGE-1.5.5')
+import os
+from os.path import dirname
+# from pathlib import Path
+
+# ROUGE_EVAL_HOME = str(Path(dirname(__file__)) / '../tools/ROUGE-1.5.5')
+
+ROUGE_EVAL_HOME = os.path.join(os.path.abspath(dirname(__file__)), "../tools/ROUGE-1.5.5")
+# print(ROUGE_EVAL_HOME)
 
 class Doc(object):
     def __init__(self, id, sents=[]):
