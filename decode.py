@@ -27,7 +27,11 @@ import util
 import logging
 import codecs
 import numpy as np
-from pyltp import SentenceSplitter
+import util
+try:
+  from pyltp import SentenceSplitter
+except ImportError:
+  SentenceSplitter = None
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -136,19 +140,26 @@ class BeamSearchDecoder(object):
       decoded_words: list of strings
       ex_index: int, the index with which to label the files
     """
+
     # First, divide decoded output into sentences
     decoded_sents = []
     while len(decoded_words) > 0:
-      try:
-        fst_period_idx = decoded_words.index(".")
-      except ValueError: # there is text remaining that doesn't end in "."
-        fst_period_idx = len(decoded_words)
-      sent = decoded_words[:fst_period_idx+1] # sentence up to and including the period
-      decoded_words = decoded_words[fst_period_idx+1:] # everything else
-      decoded_sents.append(' '.join(sent))
 
-    decoded_text = "".join(decoded_sents)
-    decoded_sents = SentenceSplitter.split(decoded_text.encode("utf-8"))
+      # try:
+      #   fst_period_idx = decoded_words.index(".")
+      # except ValueError: # there is text remaining that doesn't end in "."
+      #   fst_period_idx = len(decoded_words)
+      # sent = decoded_words[:fst_period_idx+1] # sentence up to and including the period
+      # decoded_words = decoded_words[fst_period_idx+1:] # everything else
+      # decoded_sents.append(' '.join(sent))
+
+      if SentenceSplitter is None:
+        decoded_sents = util.cut_sentence(decoded_words)
+        for i in range(len(decoded_sents)):
+          decoded_sents[i] = " ".join(decoded_sents[i])
+      else:
+        decoded_text = "".join(decoded_words)
+        decoded_sents = SentenceSplitter.split(decoded_text.encode("utf-8"))
 
     # pyrouge calls a perl script that puts the data into HTML files.
     # Therefore we need to make our output HTML safe.

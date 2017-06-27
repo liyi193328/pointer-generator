@@ -1,3 +1,5 @@
+#encoding=utf-8
+
 # Copyright 2016 The TensorFlow Authors. All Rights Reserved.
 # Modifications Copyright 2017 Abigail See
 #
@@ -15,10 +17,11 @@
 # ==============================================================================
 
 """This file contains some utility functions"""
-
 import tensorflow as tf
 import time
 import os
+import six
+import numpy as np
 FLAGS = tf.app.flags.FLAGS
 
 def get_config():
@@ -39,3 +42,27 @@ def load_ckpt(saver, sess):
     except:
       tf.logging.info("Failed to load checkpoint from %s. Sleeping for %i secs...", train_dir, 10)
       time.sleep(10)
+
+def cut_sentence(words):
+
+  start = 0
+  i = 0  # 记录每个字符的位置
+  sents = []
+  punt_list = ',.!?:;~，。！？：；～' # string 必须要解码为 unicode 才能进行匹配
+  if six.PY2:
+    punt_list = punt_list.decode("utf-8")
+  for word in words:
+    # if six.PY2 and type(word) == str:
+    word = word.encode("utf-8")
+    if word in punt_list:
+      sents.append(words[start:i + 1])
+      start = i + 1  # start标记到下一句的开头
+      i += 1
+    else:
+      i += 1  # 若不是标点符号，则字符位置继续前移
+  if start < len(words):
+    sents.append(words[start:])  # 这是为了处理文本末尾没有标点符号的情况
+  return sents
+
+if __name__ == "__main__":
+  print( cut_sentence(["我爱","中国","。","我爱","中国"]) )
