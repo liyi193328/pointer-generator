@@ -51,9 +51,12 @@ def cut_sentence(words):
   punt_list = ',.!?:;~，。！？：；～' # string 必须要解码为 unicode 才能进行匹配
   if six.PY2:
     punt_list = punt_list.decode("utf-8")
+  # print(punt_list)
+  # print(type(punt_list))
   for word in words:
-    # if six.PY2 and type(word) == str:
-    word = word.encode("utf-8")
+    if six.PY2 and type(word) == str:
+      word = word.decode("utf-8")
+    # print(type(word))
     if word in punt_list:
       sents.append(words[start:i + 1])
       start = i + 1  # start标记到下一句的开头
