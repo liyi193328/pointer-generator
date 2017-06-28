@@ -26,6 +26,8 @@ import pyrouge
 import util
 import logging
 import codecs
+import six
+import shutil
 import numpy as np
 import util
 try:
@@ -64,7 +66,10 @@ class BeamSearchDecoder(object):
       ckpt_name = "ckpt-" + ckpt_path.split('-')[-1] # this is something of the form "ckpt-123456"
       self._decode_dir = os.path.join(FLAGS.log_root, get_decode_dir_name(ckpt_name))
       if os.path.exists(self._decode_dir):
-        raise Exception("single_pass decode directory %s should not already exist" % self._decode_dir)
+        if FLAGS.clear_decode_dir is True:
+          shutil.rmtree(self._decode_dir)
+        else:
+          raise Exception("single_pass decode directory %s should not already exist" % self._decode_dir)
 
     else: # Generic decode dir name
       self._decode_dir = os.path.join(FLAGS.log_root, "decode")
@@ -143,8 +148,8 @@ class BeamSearchDecoder(object):
 
     # First, divide decoded output into sentences
     decoded_sents = []
-    while len(decoded_words) > 0:
 
+    # while len(decoded_words) > 0:
       # try:
       #   fst_period_idx = decoded_words.index(".")
       # except ValueError: # there is text remaining that doesn't end in "."
@@ -153,13 +158,13 @@ class BeamSearchDecoder(object):
       # decoded_words = decoded_words[fst_period_idx+1:] # everything else
       # decoded_sents.append(' '.join(sent))
 
-      if SentenceSplitter is None:
-        decoded_sents = util.cut_sentence(decoded_words)
-        for i in range(len(decoded_sents)):
-          decoded_sents[i] = " ".join(decoded_sents[i])
-      else:
-        decoded_text = "".join(decoded_words)
-        decoded_sents = SentenceSplitter.split(decoded_text.encode("utf-8"))
+    if SentenceSplitter is None:
+      decoded_sents = util.cut_sentence(decoded_words)
+      for i in range(len(decoded_sents)):
+        decoded_sents[i] = " ".join(decoded_sents[i])
+    else:
+      decoded_text = " ".join(decoded_words)
+      decoded_sents = SentenceSplitter.split(decoded_text.encode("utf-8"))
 
     # pyrouge calls a perl script that puts the data into HTML files.
     # Therefore we need to make our output HTML safe.
@@ -179,14 +184,30 @@ class BeamSearchDecoder(object):
           f.write(sent + "\n")
         f.write("\n")
         for idx, sent in enumerate(decoded_sents):
-          f.write(sent) if idx == len(decoded_sents) - 1 else f.write(sent + "\n")
+          if six.PY2 and type(sent) == str:
+            sent = sent.decode("utf-8")
+          if idx == len(decoded_sents) - 1:
+            f.write(sent)
+          else:
+            f.write(sent + "\n")
 
     with codecs.open(ref_file, "w", "utf-8") as f:
       for idx,sent in enumerate(reference_sents):
-        f.write(sent) if idx==len(reference_sents)-1 else f.write(sent+"\n")
+        if six.PY2 and type(sent) == str:
+          sent = sent.decode("utf-8")
+        if idx == len(decoded_sents) - 1:
+          f.write(sent)
+        else:
+          f.write(sent + "\n")
+
     with codecs.open(decoded_file, "w", "utf-8") as f:
       for idx,sent in enumerate(decoded_sents):
-        f.write(sent) if idx==len(decoded_sents)-1 else f.write(sent+"\n")
+        if six.PY2 and type(sent) == str:
+          sent = sent.decode("utf-8")
+        if idx == len(decoded_sents) - 1:
+          f.write(sent)
+        else:
+          f.write(sent + "\n")
 
 
     tf.logging.info("Wrote example %i to file" % ex_index)

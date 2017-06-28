@@ -48,11 +48,7 @@ def cut_sentence(words):
   start = 0
   i = 0  # 记录每个字符的位置
   sents = []
-  punt_list = ',.!?:;~，。！？：；～' # string 必须要解码为 unicode 才能进行匹配
-  if six.PY2:
-    punt_list = punt_list.decode("utf-8")
-  # print(punt_list)
-  # print(type(punt_list))
+  punt_list = u',.!?:;~，。！？：；～' # string 必须要解码为 unicode 才能进行匹配
   for word in words:
     if six.PY2 and type(word) == str:
       word = word.decode("utf-8")
