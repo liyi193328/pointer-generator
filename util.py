@@ -17,11 +17,12 @@
 # ==============================================================================
 
 """This file contains some utility functions"""
-import tensorflow as tf
 import time
 import os
 import six
+import codecs
 import numpy as np
+import tensorflow as tf
 FLAGS = tf.app.flags.FLAGS
 
 def get_config():
@@ -62,6 +63,19 @@ def cut_sentence(words):
   if start < len(words):
     sents.append(words[start:])  # 这是为了处理文本末尾没有标点符号的情况
   return sents
+
+def read_sum_sents(file_path,sent_token=False):
+  f = codecs.open(file_path, "r", "utf-8")
+  sum_sents = []
+  while True:
+    line = f.readline()
+    if line == "":
+      break
+    sents = line.strip()
+    if sent_token:
+      sents = sents.split(" ")
+    sum_sents.append(sents)
+  return sum_sents
 
 if __name__ == "__main__":
   print( cut_sentence(["我爱","中国","。","我爱","中国"]) )

@@ -22,14 +22,15 @@ import tensorflow as tf
 import beam_search
 import data
 import json
-import pyrouge
+import rouge
+import rouge_score
 import util
 import logging
 import codecs
 import six
 import shutil
 import numpy as np
-import util
+from collections import OrderedDict
 try:
   from pyltp import SentenceSplitter
 except ImportError:
@@ -79,13 +80,14 @@ class BeamSearchDecoder(object):
 
     if FLAGS.single_pass:
       # Make the dirs to contain output written in the correct format for pyrouge
-      self._rouge_ref_dir = os.path.join(self._decode_dir, "reference")
-      if not os.path.exists(self._rouge_ref_dir): os.mkdir(self._rouge_ref_dir)
-      self._rouge_dec_dir = os.path.join(self._decode_dir, "decoded")
-      if not os.path.exists(self._rouge_dec_dir): os.mkdir(self._rouge_dec_dir)
-      self._article_with_gen_abs_dir = os.path.join(self._decode_dir, "art_decoded")
-      if not os.path.exists(self._article_with_gen_abs_dir): os.makedirs(self._article_with_gen_abs_dir)
+      self._rouge_ref_path = os.path.join(self._decode_dir, "ref.txt")
+      self._rouge_dec_path = os.path.join(self._decode_dir, "infer.txt")
+      self._article_with_gen_abs_path = os.path.join(self._decode_dir, "article_ref_infer.txt")
+      self._ref_f = codecs.open(self._rouge_ref_path, "w", "utf-8")
+      self._dec_f = codecs.open(self._rouge_dec_path, "w", "utf-8")
+      self._gen_f = codecs.open(self._article_with_gen_abs_path, "w","utf-8")
 
+      self._rouge_result_path = os.path.join(self._decode_dir, "rouge_result.log")
 
   def decode(self):
     """Decode examples until data is exhausted (if FLAGS.single_pass) and return, or decode indefinitely, loading latest checkpoint at regular intervals"""
@@ -97,8 +99,7 @@ class BeamSearchDecoder(object):
         assert FLAGS.single_pass, "Dataset exhausted, but we are not in single_pass mode"
         tf.logging.info("Decoder has finished reading dataset for single_pass.")
         tf.logging.info("Output has been saved in %s and %s. Now starting ROUGE eval...", self._rouge_ref_dir, self._rouge_dec_dir)
-        results_dict = rouge_eval(self._rouge_ref_dir, self._rouge_dec_dir)
-        rouge_log(results_dict, self._decode_dir)
+        results_dict = rouge_eval_write(self._rouge_ref_path, self._rouge_dec_path, self._article_with_gen_abs_path)
         return
 
       original_article = batch.original_articles[0]  # string
@@ -172,12 +173,9 @@ class BeamSearchDecoder(object):
     reference_sents = [make_html_safe(w) for w in reference_sents]
 
     # Write to file
-    ref_file = os.path.join(self._rouge_ref_dir, "%06d_reference.txt" % ex_index)
-    decoded_file = os.path.join(self._rouge_dec_dir, "%06d_decoded.txt" % ex_index)
-    article_with_gen_abs_file = os.path.join(self._article_with_gen_abs_dir, "%06d_article_decoded.txt" % ex_index)
 
     if article is not None:
-      with codecs.open(article_with_gen_abs_file, "w", "utf-8") as f:
+      with codecs.open(self._article_with_gen_abs_path, "a", "utf-8") as f:
         f.write(article + "\n")
         f.write("\n")
         for idx, sent in enumerate(reference_sents):
@@ -191,27 +189,21 @@ class BeamSearchDecoder(object):
           else:
             f.write(sent + "\n")
 
-    with codecs.open(ref_file, "w", "utf-8") as f:
+    with codecs.open(self._rouge_ref_path, "a", "utf-8") as f:
       for idx,sent in enumerate(reference_sents):
         if six.PY2 and type(sent) == str:
-          sent = sent.decode("utf-8")
-        if idx == len(decoded_sents) - 1:
-          f.write(sent)
-        else:
-          f.write(sent + "\n")
+          reference_sents[idx] = sent.decode("utf-8")
+      reference_sents_str = "".join(reference_sents)
+      f.write(reference_sents_str + "\n")
 
-    with codecs.open(decoded_file, "w", "utf-8") as f:
+    with codecs.open(self._rouge_dec_path, "a", "utf-8") as f:
       for idx,sent in enumerate(decoded_sents):
         if six.PY2 and type(sent) == str:
-          sent = sent.decode("utf-8")
-        if idx == len(decoded_sents) - 1:
-          f.write(sent)
-        else:
-          f.write(sent + "\n")
-
+          decoded_sents[idx] = sent.decode("utf-8")
+      decoded_sents_str = "".join(decoded_sents)
+      f.write(decoded_sents_str + "\n")
 
     tf.logging.info("Wrote example %i to file" % ex_index)
-
 
   def write_for_attnvis(self, article, abstract, decoded_words, attn_dists, p_gens):
     """Write some data to json file, which can be read into the in-browser attention visualizer tool:
@@ -256,40 +248,22 @@ def make_html_safe(s):
   return s
 
 
-def rouge_eval(ref_dir, dec_dir):
+def rouge_eval_write(ref_path, dec_path, result_path):
   """Evaluate the files in ref_dir and dec_dir with pyrouge, returning results_dict"""
-  r = pyrouge.Rouge155()
-  r.model_filename_pattern = '#ID#_reference.txt'
-  r.system_filename_pattern = '(\d+)_decoded.txt'
-  r.model_dir = ref_dir
-  r.system_dir = dec_dir
-  logging.getLogger('global').setLevel(logging.WARNING) # silence pyrouge logging
-  rouge_results = r.convert_and_evaluate()
-  return r.output_to_dict(rouge_results)
-
-
-def rouge_log(results_dict, dir_to_write):
-  """Log ROUGE results to screen and write to file.
-
-  Args:
-    results_dict: the dictionary returned by pyrouge
-    dir_to_write: the directory where we will write the results to"""
-  log_str = ""
-  for x in ["1","2","l"]:
-    log_str += "\nROUGE-%s:\n" % x
-    for y in ["f_score", "recall", "precision"]:
-      key = "rouge_%s_%s" % (x,y)
-      key_cb = key + "_cb"
-      key_ce = key + "_ce"
-      val = results_dict[key]
-      val_cb = results_dict[key_cb]
-      val_ce = results_dict[key_ce]
-      log_str += "%s: %.4f with confidence interval (%.4f, %.4f)\n" % (key, val, val_cb, val_ce)
-  tf.logging.info(log_str) # log to screen
-  results_file = os.path.join(dir_to_write, "ROUGE_results.txt")
-  tf.logging.info("Writing final ROUGE results to %s...", results_file)
-  with open(results_file, "w") as f:
-    f.write(log_str)
+  ref_sum_sents = util.read_sum_sents(ref_path, sent_token=False)
+  des_sum_sents = util.read_sum_sents(dec_path, sent_token=False)
+  assert  len(ref_sum_sents) == len(des_sum_sents)
+  rou = rouge.Rouge()
+  scores = rou.get_scores(des_sum_sents, ref_sum_sents)
+  ave_scores = rou.get_scores(des_sum_sents, ref_sum_sents, avg=True)
+  rouge_eval_f = codecs.open(result_path, "w", "utf-8")
+  result = OrderedDict()
+  result["ave_scores"] = ave_scores
+  result["detail_scores"] = scores
+  json.dump(result, rouge_eval_f, indent=2)
+  tf.logging.info(ave_scores)
+  tf.logging.info("write eval result to {}".format(result_path))
+  return result
 
 def get_decode_dir_name(ckpt_name):
   """Make a descriptive name for the decode dir, including the name of the checkpoint we use to decode. This is called in single_pass mode."""
