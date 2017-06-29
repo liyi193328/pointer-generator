@@ -98,9 +98,15 @@ class BeamSearchDecoder(object):
       if batch is None: # finished decoding dataset in single_pass mode
         assert FLAGS.single_pass, "Dataset exhausted, but we are not in single_pass mode"
         tf.logging.info("Decoder has finished reading dataset for single_pass.")
-        tf.logging.info("Output has been saved in %s and %s. Now starting ROUGE eval...", self._rouge_ref_dir, self._rouge_dec_dir)
-        results_dict = rouge_eval_write(self._rouge_ref_path, self._rouge_dec_path, self._article_with_gen_abs_path)
+        tf.logging.info("Output has been saved in %s,%s and %s. Now starting ROUGE eval...", self._rouge_ref_path, self._rouge_dec_path, self._article_with_gen_abs_path)
+        results_dict = rouge_eval_write(self._rouge_ref_path, self._rouge_dec_path, self._rouge_result_path)
         return
+
+      if FLAGS.single_pass:
+        if FLAGS.max_infer_batch is not None and counter >= FLAGS.max_infer_batch:
+          tf.logging.info("up to max_infer_batch={}, begin to eval rogue".format(FLAGS.max_infer_batch))
+          results_dict = rouge_eval_write(self._rouge_ref_path, self._rouge_dec_path, self._rouge_result_path)
+          return
 
       original_article = batch.original_articles[0]  # string
       original_abstract = batch.original_abstracts[0]  # string
@@ -176,18 +182,17 @@ class BeamSearchDecoder(object):
 
     if article is not None:
       with codecs.open(self._article_with_gen_abs_path, "a", "utf-8") as f:
+        f.write("article:\n")
         f.write(article + "\n")
-        f.write("\n")
+        f.write("ref:\n")
         for idx, sent in enumerate(reference_sents):
           f.write(sent + "\n")
-        f.write("\n")
+        f.write("gen:\n")
         for idx, sent in enumerate(decoded_sents):
           if six.PY2 and type(sent) == str:
             sent = sent.decode("utf-8")
-          if idx == len(decoded_sents) - 1:
-            f.write(sent)
-          else:
-            f.write(sent + "\n")
+          f.write(sent + "\n")
+        f.write("\n")
 
     with codecs.open(self._rouge_ref_path, "a", "utf-8") as f:
       for idx,sent in enumerate(reference_sents):
