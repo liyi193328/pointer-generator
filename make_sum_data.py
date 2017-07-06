@@ -71,7 +71,7 @@ def preprocess_abs_text(abs_text):
   return abs_text[i:]
 
 
-def token_file(file_path, token_path_or_handle, abs_index=1, article_index=2, delimiter="\t"):
+def token_file(file_path, token_path_or_handle, head_index=0, abs_index=1, article_index=2, delimiter="\t"):
   save = False
   if type(token_path_or_handle) == six.text_type:
     fo = codecs.open(token_path_or_handle, "w", "utf-8")
@@ -107,7 +107,7 @@ def token_file(file_path, token_path_or_handle, abs_index=1, article_index=2, de
   if save:
     print("tokenize {}, save to {}".format(file_path, token_path_or_handle))
 
-def token_file_or_dir(file_or_dir, token_path_or_dir, abs_index=1, article_index = 2, delimiter="\t", filters=None, pnums=MP.cpu_count() - 1):
+def token_file_or_dir(file_or_dir, token_path_or_dir, abs_index=1, article_index = 2, delimiter="\t", filters=None, pnums = MP.cpu_count() - 1):
   if os.path.isdir(file_or_dir):
     path_list = []
     for i, filename in enumerate(os.listdir(file_or_dir)):
@@ -167,7 +167,7 @@ def preprocess_abs_tokens(abs, article=None, max_substring_sents=1):
     pre_abs = pre_abs.decode("utf-8")
   return pre_abs
 
-def preprocess_article_tokens(article, min_tokens=200, max_tokens=None, token_split=" "):
+def preprocess_article_tokens(article, min_tokens=50, max_tokens=None, token_split=" "):
   if article.strip() == "":
     return False
   if isinstance(article, six.text_type) == False:
