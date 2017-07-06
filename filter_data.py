@@ -76,7 +76,7 @@ def filter_vocab(vocab_path, save_path, del_num=True, del_en=True):
 @click.option("--abs_index", type=int, default=2, help="abs index in one line[1]")
 @click.option("--article_index", type=int, default=3, help="article index in one line[1]")
 @click.option("--cancel_unk_label", is_flag=True, help="whether cancel null label")
-@click.option("--abs_max_cov_sents", type=int, default=None, help="abstract very high sim to article 's max sents[100]")
+@click.option("--abs_max_cov_sents", type=int, default=100, help="abstract very high sim to article 's max sents[100]")
 def filter_stat(path, stat_path, save_path, label_index=0, title_index=1, abs_index=2, article_index=3,
                 min_abs_chars=0, max_abs_chars=int(2e5), abs_max_cov_sents=100, cancel_unk_label=False):
   len_stat = []
