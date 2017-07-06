@@ -128,7 +128,7 @@ def filter_stat(path, stat_path, save_path, label_index=0, title_index=1, abs_in
       len_stat.append([len(article), len(abstract)])
       fo.write("\t".join([title, abstract, article]) + "\n")
 
-  print("filter docs with abs len not in range[{},{})".format(abs_len_filter_num))
+  print("filter docs with abs len not in range[{},{})".format(abs_len_filter_num, ))
   print("skip {} docs with high coverage in article".format(cov_skip_abs))
   print("{} docs have no label".format(no_label_num))
   print("use:all = {}:{}".format(use_samples, i))
