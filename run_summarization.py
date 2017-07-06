@@ -41,6 +41,7 @@ tf.app.flags.DEFINE_boolean('single_pass', False, 'For decode mode only. If True
 # Where to save output
 tf.app.flags.DEFINE_string('log_root', '', 'Root directory for all logging.')
 tf.app.flags.DEFINE_string('exp_name', '', 'Name for experiment. Logs will be saved in a directory with this name, under log_root.')
+tf.app.flags.DEFINE_bool("clear_log_root_dir", False, "clear log_root dir before train[False]")
 tf.app.flags.DEFINE_boolean("clear_decode_dir", False, "whether clear decode dir  before decode")
 # Hyperparameters
 tf.app.flags.DEFINE_integer('hidden_dim', 256, 'dimension of RNN hidden states')
@@ -238,6 +239,10 @@ def main(unused_argv):
       os.makedirs(FLAGS.log_root)
     else:
       raise Exception("Logdir %s doesn't exist. Run in train mode to create it." % (FLAGS.log_root))
+  elif FLAGS.clear_log_root_dir:
+    import shutil
+    shutil.rmtree(FLAGS.log_root)
+    tf.logging.warn("remove {}".format(FLAGS.log_root))
 
   vocab = Vocab(FLAGS.vocab_path, FLAGS.vocab_size) # create a vocabulary
 

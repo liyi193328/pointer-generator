@@ -1,6 +1,10 @@
 #encoding=utf-8
 
 
+chinese_non_stops = u'＂＃＄％＆＇（）＊＋，－／：；＜＝＞＠［＼］＾＿｀｛｜｝～｟｠｢｣､、〃》「」『』【】〔〕〖〗〘〙〚〛〜〝〞〟〰〾〿–—‘’‛“”„‟…‧﹏'
+chinese_stops = u"！？｡。"
+chinese_punctuations = chinese_non_stops + chinese_stops
+
 # 判断一个unicode是否是汉字
 def is_chinese(uchar):
   if u'\u4e00' <= uchar <= u'\u9fff':
@@ -16,6 +20,10 @@ def is_number(uchar):
   else:
     return False
 
+def is_chinese_punctuation(uchar):
+  if uchar in chinese_punctuations:
+    return True
+  return False
 
 # 判断一个unicode是否是英文字母
 def is_alphabet(uchar):
@@ -31,3 +39,6 @@ def is_other(uchar):
     return True
   else:
     return False
+
+if __name__ == "__main__":
+  print(is_chinese_punctuation(u"ha"))
