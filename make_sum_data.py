@@ -192,12 +192,12 @@ def get_article_abs(line, delimeter="\t", abs_index=1, article_index=2):
   abs = preprocess_abs_tokens(or_abs)
   stop = False
   if article is False:
-    print("article is False")
-    print(or_article)
+    # print("article is False")
+    # print(or_article)
     stop = True
   if abs is False:
-    print("abs is False")
-    print(or_abs)
+    # print("abs is False")
+    # print(or_abs)
     stop = True
   return [article, abs]
 
