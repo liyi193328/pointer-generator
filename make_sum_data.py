@@ -119,6 +119,7 @@ def token_file_or_dir(file_or_dir, token_path_or_dir, abs_index=1, article_index
     path_list = [file_or_dir]
   print("will tokenize {} files: {}...".format(len(path_list), path_list[0:3]))
   if os.path.isdir(token_path_or_dir):
+    pnums = min(pnums, len(path_list))
     print("will use {} pros to tokenize".format(pnums))
     pool = MP.Pool(pnums)
     pros = []
