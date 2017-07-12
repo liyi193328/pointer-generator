@@ -70,7 +70,6 @@ def preprocess_abs_text(abs_text):
       break
   return abs_text[i:]
 
-
 def token_file(file_path, token_path_or_handle, head_index=0, abs_index=1, article_index=2, delimiter="\t"):
   save = False
   if type(token_path_or_handle) == six.text_type:
@@ -328,9 +327,9 @@ def chunk_all(bin_dir, chunks_dir):
 @click.option("--token_file_name", default=None, help="when source is file, must provide(suffix may not .token")
 @click.option("--abs_index", default=1, type=int, help="abstract index in one line[1]")
 @click.option("--article_index", default=2, type=int, help="article index in one line[2]")
-@click.option("--ratios", default="0.8,0.1,0.1", type=str, help="train:dev:test=0.8:0.1:0.1")
-@click.option("--tokenized", is_flag=True, help="if set, don't tokenize")
-def mak_sum_data(source_path_or_dir, write_dir, tokenized=True, token_dir_name=None, token_file_name=None, abs_index=1, article_index=2, ratios="0.8,0.1,0.1"):
+@click.option("--ratios", default="0.9:0.05:0.05", type=str, help="train:dev:test=0.9:0.05:0.05")
+@click.option("--tokenize", is_flag=True, help="if set, tokenize")
+def mak_sum_data(source_path_or_dir, write_dir, tokenize=True, token_dir_name=None, token_file_name=None, abs_index=1, article_index=2, ratios="0.9,0.05,0.05"):
   from os.path import join
   if os.path.isdir(source_path_or_dir):
     if token_dir_name is None:
@@ -351,8 +350,10 @@ def mak_sum_data(source_path_or_dir, write_dir, tokenized=True, token_dir_name=N
   bin_dir = join(write_dir, "bin")
   chunks_dir = join(write_dir, "chunked")
   vocab_path = join(write_dir, "vocab")
-  if not tokenized:
+  if tokenize:
     token_file_or_dir(source_path_or_dir, token_path_or_dir)
+  else:
+    print("will not tokenize {}".format(source_path_or_dir))
   make_bin_data(token_path_or_dir, bin_dir, vocab_path, abs_index=abs_index, article_index=article_index, ratios=ratios)
   chunk_all(bin_dir, chunks_dir)
 
