@@ -32,7 +32,7 @@ segmentor.load(cws_model_path)  # 加载模型
 
 PARA_TAG = "</para>"
 VOCAB_SIZE = 200000
-CHUNK_SIZE = 1000 # num examples per chunk, for the chunked data
+CHUNK_SIZE = 10000 # num examples per chunk, for the chunked data
 dm_single_close_quote = u'\u2019' # unicode
 dm_double_close_quote = u'\u201d'
 END_TOKENS = ['.', '!', '?', '...', "'", "`", '"', dm_single_close_quote, dm_double_close_quote, ")"] # acceptable ways to end a sentence
@@ -166,7 +166,7 @@ def preprocess_abs_tokens(abs, article=None, max_substring_sents=1):
     pre_abs = pre_abs.decode("utf-8")
   return pre_abs
 
-def preprocess_article_tokens(article, min_tokens=50, max_tokens=None, token_split=" "):
+def preprocess_article_tokens(article, min_tokens=3, max_tokens=None, token_split=" "):
   if article.strip() == "":
     return False
   if isinstance(article, six.text_type) == False:
@@ -178,10 +178,10 @@ def preprocess_article_tokens(article, min_tokens=50, max_tokens=None, token_spl
     return False
   return article
 
-def get_article_abs(line, delimeter="\t", abs_index=1, article_index=2):
+def get_article_abs(line, delimeter="\t", source_index=0, target_index=1):
   eles = line.strip().split(delimeter)
   try:
-    or_article, or_abs = eles[article_index], eles[abs_index]
+    or_article, or_abs = eles[source_index], eles[target_index]
   except IndexError:
     print(line)
     print("Index error")
@@ -191,16 +191,12 @@ def get_article_abs(line, delimeter="\t", abs_index=1, article_index=2):
   abs = preprocess_abs_tokens(or_abs)
   stop = False
   if article is False:
-    # print("article is False")
-    # print(or_article)
     stop = True
   if abs is False:
-    # print("abs is False")
-    # print(or_abs)
     stop = True
   return [article, abs]
 
-def save_article_abs(lines, bin_path, text_path, abs_index=1, article_index=2, vocab_path=None, makevocab=False):
+def save_article_abs(lines, bin_path, text_path, source_index=0, target_index=1, vocab_path=None, makevocab=False):
 
   if makevocab and vocab_path is None:
     raise  ValueError("make vocab must provide vocab_path")
@@ -214,7 +210,7 @@ def save_article_abs(lines, bin_path, text_path, abs_index=1, article_index=2, v
   valid_samples = 0
   for i, line in enumerate(lines):
     # Get the strings to write to .bin file
-    article, abstract = get_article_abs(line)
+    article, abstract = get_article_abs(line,source_index=source_index, target_index=target_index)
     if article == False or abstract == False:
       continue
     art_abs_str = "\t".join([abstract, article]) + "\n"
@@ -320,6 +316,34 @@ def chunk_all(bin_dir, chunks_dir):
     chunk_file(bin_path,chunks_dir, set_name)
   print ("Saved chunked data in %s" % chunks_dir)
 
+
+@click.group()
+def cli():
+  pass
+
+@click.command()
+@click.argument("source_path_or_dir")
+@click.argument("write_dir")
+@click.argument("name")
+@click.option("--source_index", default=0, type=int, help="source index in one line")
+@click.option("--target_index", default=1, type=int, help="target index in one line")
+def make_from_tab_parallel(source_path_or_dir, write_dir, name, source_index=0, target_index=1):
+  assert  name in ["train", "val", "test"]
+  from os.path import join
+  bin_dir = join(write_dir, "bin")
+  bin_path = join(bin_dir, "{}.bin".format(name))
+  text_path = join(bin_dir, "{}.txt".format(name))
+  chunks_dir = join(write_dir, "chunked")
+  vocab_dir = join(write_dir, "vocab")
+  for d in [bin_dir, chunks_dir, vocab_dir]:
+    if os.path.exists(d) == False:
+      os.makedirs(d)
+  if os.path.isdir(source_path_or_dir) is True:
+    raise NotImplemented("{} now must be files".format(source_path_or_dir))
+  lines = codecs.open(source_path_or_dir, "r", "utf-8").readlines()
+  save_article_abs(lines, bin_path, text_path, source_index=source_index, target_index=target_index, makevocab=False)
+  chunk_file(bin_path, chunks_dir, name)
+
 @click.command()
 @click.argument("source_path_or_dir")
 @click.argument("write_dir")
@@ -329,7 +353,7 @@ def chunk_all(bin_dir, chunks_dir):
 @click.option("--article_index", default=2, type=int, help="article index in one line[2]")
 @click.option("--ratios", default="0.9:0.05:0.05", type=str, help="train:dev:test=0.9:0.05:0.05")
 @click.option("--tokenize", is_flag=True, help="if set, tokenize")
-def mak_sum_data(source_path_or_dir, write_dir, tokenize=True, token_dir_name=None, token_file_name=None, abs_index=1, article_index=2, ratios="0.9,0.05,0.05"):
+def make_sum_data(source_path_or_dir, write_dir, tokenize=True, token_dir_name=None, token_file_name=None, abs_index=1, article_index=2, ratios="0.9,0.05,0.05"):
   from os.path import join
   if os.path.isdir(source_path_or_dir):
     if token_dir_name is None:
@@ -537,6 +561,9 @@ def cnn_dayily_main():
   # Chunk the data. This splits each of train.bin, val.bin and test.bin into smaller chunks, each containing e.g. 1000 examples, and saves them in finished_files/chunks
   chunk_all()
 
+cli.add_command(make_sum_data)
+cli.add_command(make_from_tab_parallel)
+
 if __name__ == '__main__':
 
-  mak_sum_data()
+  cli()
