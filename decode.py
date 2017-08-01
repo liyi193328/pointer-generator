@@ -65,7 +65,10 @@ class BeamSearchDecoder(object):
     if FLAGS.single_pass:
       # Make a descriptive decode directory name
       ckpt_name = "ckpt-" + ckpt_path.split('-')[-1] # this is something of the form "ckpt-123456"
-      self._decode_dir = os.path.join(FLAGS.log_root, get_decode_dir_name(ckpt_name))
+      if FLAGS.infer_dir is None:
+        self._decode_dir = os.path.join(FLAGS.log_root, get_decode_dir_name(ckpt_name))
+      else:
+        self._decode_dir = os.path.join(FLAGS.infer_dir, get_decode_dir_name(ckpt_name))
       if os.path.exists(self._decode_dir):
         if FLAGS.clear_decode_dir is True:
           shutil.rmtree(self._decode_dir)
