@@ -233,7 +233,7 @@ class BeamSearchDecoder(object):
       to_write['p_gens'] = p_gens
     output_fname = os.path.join(self._decode_dir, 'attn_vis_data.json')
     with open(output_fname, 'w') as output_file:
-      json.dump(to_write, output_file)
+      json.dump(to_write, output_file, ensure_ascii=False, indent=2)
     tf.logging.info('Wrote visualization data to %s', output_fname)
 
 

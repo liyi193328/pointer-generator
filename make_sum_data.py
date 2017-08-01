@@ -16,7 +16,7 @@ import numpy as np
 from tensorflow.core.example import example_pb2
 
 import pyltp
-
+import util
 
 LTP_DATA_DIR = os.environ.get("LTP_DATA_DIR","/home/bigdata/software/LTP/ltp_data")
 cws_model_path = os.path.join(LTP_DATA_DIR, 'cws.model')
@@ -191,16 +191,15 @@ def get_article_abs(line, delimeter="\t", abs_index=1, article_index=2):
   abs = preprocess_abs_tokens(or_abs)
   stop = False
   if article is False:
-    # print("article is False")
-    # print(or_article)
     stop = True
   if abs is False:
-    # print("abs is False")
-    # print(or_abs)
     stop = True
   return [article, abs]
 
-def save_article_abs(lines, bin_path, text_path, abs_index=1, article_index=2, vocab_path=None, makevocab=False):
+def filter_save_paris(lines, bin_path, text_path, abs_index=1, article_index=2,
+                      source_min_tokens=None, source_max_tokens=None,
+                      target_min_tokens=None, target_max_tokens=None,
+                      vocab_path=None, makevocab=False):
 
   if makevocab and vocab_path is None:
     raise  ValueError("make vocab must provide vocab_path")
@@ -213,20 +212,28 @@ def save_article_abs(lines, bin_path, text_path, abs_index=1, article_index=2, v
 
   valid_samples = 0
   for i, line in enumerate(lines):
-    # Get the strings to write to .bin file
-    article, abstract = get_article_abs(line)
-    if article == False or abstract == False:
-      continue
-    art_abs_str = "\t".join([abstract, article]) + "\n"
-    ft.write(six.text_type(art_abs_str))
 
-    article = article.encode("utf-8")
-    abstract = abstract.encode("utf-8")
+    # Get the strings to write to .bin file
+    # article, abstract = get_article_abs(line)
+    # if article == False or abstract == False:
+    #   continue
+
+    x = get_source_target_pairs(line, source_min_tokens=source_min_tokens, source_max_tokens=source_max_tokens,
+                                  target_min_tokens=target_min_tokens, target_max_tokens=target_max_tokens)
+    if x is False:
+      continue
+
+    source, target = x
+    st = "\t".join([source, target]) + "\n"
+    ft.write(six.text_type(st))
+
+    source = source.encode("utf-8")
+    target = target.encode("utf-8")
 
     # Write to tf.Example
     tf_example = example_pb2.Example()
-    tf_example.features.feature['article'].bytes_list.value.extend([article])
-    tf_example.features.feature['abstract'].bytes_list.value.extend([abstract])
+    tf_example.features.feature['article'].bytes_list.value.extend([source])
+    tf_example.features.feature['abstract'].bytes_list.value.extend([target])
     tf_example_str = tf_example.SerializeToString()
     str_len = len(tf_example_str)
     writer.write(struct.pack('q', str_len))
@@ -236,10 +243,10 @@ def save_article_abs(lines, bin_path, text_path, abs_index=1, article_index=2, v
     # Write the vocab to file, if applicable
     if makevocab:
       if sys.version_info[0] == 3:
-        article = article.decode("utf-8")
-        abstract = abstract.decode("utf-8")
-      art_tokens = article.split(' ')
-      abs_tokens = abstract.split(' ')
+        source = source.decode("utf-8")
+        target = target.decode("utf-8")
+      art_tokens = source.split(' ')
+      abs_tokens = target.split(' ')
       abs_tokens = [t for t in abs_tokens if t not in [SENTENCE_START, SENTENCE_END]]  # remove these tags from vocab
       tokens = art_tokens + abs_tokens
       tokens = [t.strip() for t in tokens]  # strip
@@ -286,11 +293,69 @@ def make_bin_data(token_file_or_dir, bin_dir, vocab_dir, abs_index=1, article_in
   train_bin_path, vocab_path = join(bin_dir, "train.bin") , join(vocab_dir, "vocab.txt")
   dev_bin_path = join(bin_dir, "val.bin")
   test_bin_path = join(bin_dir, "test.bin")
-  save_article_abs(train_lines, train_bin_path, join(bin_dir, "train.txt"), makevocab=True, vocab_path=vocab_path)
-  save_article_abs(val_lines, dev_bin_path, join(bin_dir, "val.txt"))
-  save_article_abs(test_lines, test_bin_path, join(bin_dir, "test.txt"))
+  filter_save_paris(train_lines, train_bin_path, join(bin_dir, "train.txt"), makevocab=True, vocab_path=vocab_path)
+  filter_save_paris(val_lines, dev_bin_path, join(bin_dir, "val.txt"))
+  filter_save_paris(test_lines, test_bin_path, join(bin_dir, "test.txt"))
 
-def chunk_file(bin_path, chunks_dir, set_name):
+def sentence_ok(token_str, min_tokens=None, max_tokens=None):
+  tokens = token_str.split()
+  l = len(tokens)
+  if min_tokens is not None and l < min_tokens:
+    return False
+  if max_tokens is not None and l > max_tokens:
+    return False
+  return True
+
+def get_source_target_pairs(line, source_min_tokens=None, source_max_tokens=None, target_min_tokens=None, target_max_tokens=None,
+                               max_overlap=None, source_index=0, target_index=1, delimeter='\t'):
+  cells = line.strip().split(delimeter)
+  try:
+    source_str, target_str = cells[source_index], cells[target_index]
+  except IndexError:
+    print("source_index={}, target_index={}, error".format(source_index, target_index))
+    print(line)
+    return False
+  source_ok = sentence_ok(source_str, source_min_tokens, source_max_tokens)
+  if source_ok is False:
+    return False
+  target_ok = sentence_ok(target_str, target_min_tokens, target_max_tokens)
+  if target_ok is False:
+    return False
+  return [source_str, target_str]
+
+@click.group()
+def cli():
+  pass
+
+@click.command()
+@click.argument("path_or_dir")
+@click.argument("write_dir")
+@click.argument("set_name")
+@click.option("--makevocab", is_flag=True)
+@click.option("--chunk_size", default=10000)
+def convert_parallel_text(path_or_dir, write_dir, set_name, makevocab=True, chunk_size=10000):
+  assert  set_name in ["train", "val", "test"]
+  from os.path import join
+  paths = util.get_dir_or_file_path(path_or_dir)
+  bin_dir = join(write_dir, "bin")
+  vocab_dir = join(write_dir, "vocab")
+  chunks_dir = join(write_dir, "chunked")
+  if os.path.exists(bin_dir) == False:
+    os.makedirs(bin_dir)
+  if os.path.exists(vocab_dir) == False:
+    os.makedirs(vocab_dir)
+  if os.path.exists(chunks_dir) == False:
+    os.makedirs(chunks_dir)
+  bin_path = os.path.join(bin_dir, "{}.bin".format(set_name))
+  text_path = join(bin_dir, "{}.txt".format(set_name))
+  vocab_path = join(vocab_dir, "vocab.txt")
+  lines = []
+  for path in paths:
+    lines.extend(codecs.open(path, "r", "utf-8").readlines())
+  filter_save_paris(lines, bin_path, text_path, makevocab=makevocab, vocab_path=vocab_path)
+  chunk_file(bin_path, chunks_dir, set_name,chunk_size = chunk_size)
+
+def chunk_file(bin_path, chunks_dir, set_name, chunk_size=1000):
   in_file = bin_path
   reader = open(in_file, "rb")
   chunk = 0
@@ -298,7 +363,7 @@ def chunk_file(bin_path, chunks_dir, set_name):
   while not finished:
     chunk_fname = os.path.join(chunks_dir, '%s_%03d.bin' % (set_name, chunk)) # new chunk
     with open(chunk_fname, 'wb') as writer:
-      for _ in range(CHUNK_SIZE):
+      for _ in range(chunk_size):
         len_bytes = reader.read(8)
         if not len_bytes:
           finished = True
@@ -317,7 +382,7 @@ def chunk_all(bin_dir, chunks_dir):
   for set_name in ['train', 'val', 'test']:
     bin_path = os.path.join(bin_dir, "{}.bin".format(set_name))
     print ("Splitting %s data into chunks..." % bin_path)
-    chunk_file(bin_path,chunks_dir, set_name)
+    chunk_file(bin_path, chunks_dir, set_name)
   print ("Saved chunked data in %s" % chunks_dir)
 
 @click.command()
@@ -357,186 +422,9 @@ def mak_sum_data(source_path_or_dir, write_dir, tokenize=True, token_dir_name=No
   make_bin_data(token_path_or_dir, bin_dir, vocab_path, abs_index=abs_index, article_index=article_index, ratios=ratios)
   chunk_all(bin_dir, chunks_dir)
 
-
-def tokenize_stories(stories_dir, tokenized_stories_dir):
-  """Maps a whole directory of .story files to a tokenized version using Stanford CoreNLP Tokenizer"""
-  print ("Preparing to tokenize %s to %s..." % (stories_dir, tokenized_stories_dir))
-  stories = os.listdir(stories_dir)
-  # make IO list file
-  print ("Making list of files to tokenize...")
-  with open("mapping.txt", "w") as f:
-    for s in stories:
-      f.write("%s \t %s\n" % (os.path.join(stories_dir, s), os.path.join(tokenized_stories_dir, s)))
-  command = ['java', 'edu.stanford.nlp.process.PTBTokenizer', '-ioFileList', '-preserveLines', 'mapping.txt']
-  print ("Tokenizing %i files in %s and saving in %s..." % (len(stories), stories_dir, tokenized_stories_dir))
-  subprocess.call(command)
-  print ("Stanford CoreNLP Tokenizer has finished.")
-  os.remove("mapping.txt")
-
-  # Check that the tokenized stories directory contains the same number of files as the original directory
-  num_orig = len(os.listdir(stories_dir))
-  num_tokenized = len(os.listdir(tokenized_stories_dir))
-  if num_orig != num_tokenized:
-    raise Exception("The tokenized stories directory %s contains %i files, but it should contain the same number as %s (which has %i files). Was there an error during tokenization?" % (tokenized_stories_dir, num_tokenized, stories_dir, num_orig))
-  print ("Successfully finished tokenizing %s to %s.\n" % (stories_dir, tokenized_stories_dir))
-
-
-def read_text_file(text_file):
-  lines = []
-  with open(text_file, "r") as f:
-    for line in f:
-      lines.append(line.strip())
-  return lines
-
-
-def hashhex(s):
-  """Returns a heximal formated SHA1 hash of the input string."""
-  h = hashlib.sha1()
-  h.update(s)
-  return h.hexdigest()
-
-
-def get_url_hashes(url_list):
-  return [hashhex(url) for url in url_list]
-
-
-def fix_missing_period(line):
-  """Adds a period to a line that is missing a period"""
-  if "@highlight" in line: return line
-  if line=="": return line
-  if line[-1] in END_TOKENS: return line
-  # print line[-1]
-  return line + " ."
-
-
-def get_art_abs(file):
-  lines = read_text_file(file)
-
-  # Lowercase everything
-  lines = [line.lower() for line in lines]
-
-  # Put periods on the ends of lines that are missing them (this is a problem in the dataset because many image captions don't end in periods; consequently they end up in the body of the article as run-on sentences)
-  lines = [fix_missing_period(line) for line in lines]
-
-  # Separate out article and abstract sentences
-  article_lines = []
-  highlights = []
-  next_is_highlight = False
-  for idx,line in enumerate(lines):
-    if line == "":
-      continue # empty line
-    elif line.startswith("@highlight"):
-      next_is_highlight = True
-    elif next_is_highlight:
-      highlights.append(line)
-    else:
-      article_lines.append(line)
-
-  # Make article into a single string
-  article = ' '.join(article_lines)
-
-  # Make abstract into a signle string, putting <s> and </s> tags around the sentences
-  abstract = ' '.join(["%s %s %s" % (SENTENCE_START, sent, SENTENCE_END) for sent in highlights])
-
-  return article, abstract
-
-
-def write_to_bin(url_file, out_file, makevocab=False):
-  """Reads the tokenized .story files corresponding to the urls listed in the url_file and writes them to a out_file."""
-  print ("Making bin file for URLs listed in %s..." % url_file)
-  url_list = read_text_file(url_file)
-  url_hashes = get_url_hashes(url_list)
-  story_fnames = [s+".story" for s in url_hashes]
-  num_stories = len(story_fnames)
-
-  if makevocab:
-    vocab_counter = collections.Counter()
-
-  with open(out_file, 'wb') as writer:
-    for idx,s in enumerate(story_fnames):
-      if idx % 1000 == 0:
-        print ("Writing story %i of %i; %.2f percent done" % (idx, num_stories, float(idx)*100.0/float(num_stories)))
-
-      # Look in the tokenized story dirs to find the .story file corresponding to this url
-      if os.path.isfile(os.path.join(cnn_tokenized_stories_dir, s)):
-        story_file = os.path.join(cnn_tokenized_stories_dir, s)
-      elif os.path.isfile(os.path.join(dm_tokenized_stories_dir, s)):
-        story_file = os.path.join(dm_tokenized_stories_dir, s)
-      else:
-        print ("Error: Couldn't find tokenized story file %s in either tokenized story directories %s and %s. Was there an error during tokenization?" % (s, cnn_tokenized_stories_dir, dm_tokenized_stories_dir))
-        # Check again if tokenized stories directories contain correct number of files
-        print ("Checking that the tokenized stories directories %s and %s contain correct number of files..." % (cnn_tokenized_stories_dir, dm_tokenized_stories_dir))
-        check_num_stories(cnn_tokenized_stories_dir, num_expected_cnn_stories)
-        check_num_stories(dm_tokenized_stories_dir, num_expected_dm_stories)
-        raise Exception("Tokenized stories directories %s and %s contain correct number of files but story file %s found in neither." % (cnn_tokenized_stories_dir, dm_tokenized_stories_dir, s))
-
-      # Get the strings to write to .bin file
-      article, abstract = get_art_abs(story_file)
-
-      # Write to tf.Example
-      tf_example = example_pb2.Example()
-      tf_example.features.feature['article'].bytes_list.value.extend([article])
-      tf_example.features.feature['abstract'].bytes_list.value.extend([abstract])
-      tf_example_str = tf_example.SerializeToString()
-      str_len = len(tf_example_str)
-      writer.write(struct.pack('q', str_len))
-      writer.write(struct.pack('%ds' % str_len, tf_example_str))
-
-      # Write the vocab to file, if applicable
-      if makevocab:
-        art_tokens = article.split(' ')
-        abs_tokens = abstract.split(' ')
-        abs_tokens = [t for t in abs_tokens if t not in [SENTENCE_START, SENTENCE_END]] # remove these tags from vocab
-        tokens = art_tokens + abs_tokens
-        tokens = [t.strip() for t in tokens] # strip
-        tokens = [t for t in tokens if t!=""] # remove empty
-        vocab_counter.update(tokens)
-
-  print ("Finished writing file %s\n" % out_file)
-
-  # write vocab to file
-  if makevocab:
-    print ("Writing vocab file...")
-    with open(os.path.join(finished_files_dir, "vocab"), 'w') as writer:
-      for word, count in vocab_counter.most_common(VOCAB_SIZE):
-        writer.write(word + ' ' + str(count) + '\n')
-    print ("Finished writing vocab file")
-
-
-def check_num_stories(stories_dir, num_expected):
-  num_stories = len(os.listdir(stories_dir))
-  if num_stories != num_expected:
-    raise Exception("stories directory %s contains %i files but should contain %i" % (stories_dir, num_stories, num_expected))
-
-
-def cnn_dayily_main():
-  if len(sys.argv) != 3:
-    print ("USAGE: python make_datafiles.py <cnn_stories_dir> <dailymail_stories_dir>")
-    sys.exit()
-  cnn_stories_dir = sys.argv[1]
-  dm_stories_dir = sys.argv[2]
-
-  # Check the stories directories contain the correct number of .story files
-  check_num_stories(cnn_stories_dir, num_expected_cnn_stories)
-  check_num_stories(dm_stories_dir, num_expected_dm_stories)
-
-  # Create some new directories
-  if not os.path.exists(cnn_tokenized_stories_dir): os.makedirs(cnn_tokenized_stories_dir)
-  if not os.path.exists(dm_tokenized_stories_dir): os.makedirs(dm_tokenized_stories_dir)
-  if not os.path.exists(finished_files_dir): os.makedirs(finished_files_dir)
-
-  # Run stanford tokenizer on both stories dirs, outputting to tokenized stories directories
-  tokenize_stories(cnn_stories_dir, cnn_tokenized_stories_dir)
-  tokenize_stories(dm_stories_dir, dm_tokenized_stories_dir)
-
-  # Read the tokenized stories, do a little postprocessing then write to bin files
-  write_to_bin(all_test_urls, os.path.join(finished_files_dir, "test.bin"))
-  write_to_bin(all_val_urls, os.path.join(finished_files_dir, "val.bin"))
-  write_to_bin(all_train_urls, os.path.join(finished_files_dir, "train.bin"), makevocab=True)
-
-  # Chunk the data. This splits each of train.bin, val.bin and test.bin into smaller chunks, each containing e.g. 1000 examples, and saves them in finished_files/chunks
-  chunk_all()
+cli.add_command(convert_parallel_text)
+cli.add_command(mak_sum_data)
 
 if __name__ == '__main__':
 
-  mak_sum_data()
+  cli()

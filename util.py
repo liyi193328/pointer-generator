@@ -21,9 +21,19 @@ import time
 import os
 import six
 import codecs
+import glob
 import numpy as np
 import tensorflow as tf
 FLAGS = tf.app.flags.FLAGS
+
+def get_dir_or_file_path(dir_or_path, max_deep=1):
+  if os.path.exists(dir_or_path) == False:
+    raise ValueError("{} not exists".format(dir_or_path))
+  if os.path.isdir(dir_or_path):
+    all_paths = [os.path.join(dir_or_path, name) for name in os.listdir(dir_or_path)]
+  else:
+    all_paths = glob.glob(dir_or_path)
+  return all_paths
 
 def get_config():
   """Returns config for tf.session"""

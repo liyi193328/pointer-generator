@@ -255,6 +255,7 @@ class Batcher(object):
       self._example_q_threads[-1].daemon = True
       self._example_q_threads[-1].start()
     self._batch_q_threads = []
+
     for _ in range(self._num_batch_q_threads):
       self._batch_q_threads.append(Thread(target=self.fill_batch_queue))
       self._batch_q_threads[-1].daemon = True
