@@ -44,6 +44,7 @@ tf.app.flags.DEFINE_string('log_root', '', 'Root directory for all logging.')
 tf.app.flags.DEFINE_string('exp_name', '', 'Name for experiment. Logs will be saved in a directory with this name, under log_root.')
 tf.app.flags.DEFINE_bool("clear_log_root_dir", False, "clear log_root dir before train[False]")
 tf.app.flags.DEFINE_boolean("clear_decode_dir", False, "whether clear decode dir  before decode")
+
 # Hyperparameters
 tf.app.flags.DEFINE_integer('hidden_dim', 256, 'dimension of RNN hidden states')
 tf.app.flags.DEFINE_integer('emb_dim', 128, 'dimension of word embeddings')
@@ -60,6 +61,9 @@ tf.app.flags.DEFINE_float('trunc_norm_init_std', 1e-4, 'std of trunc norm init, 
 tf.app.flags.DEFINE_float('max_grad_norm', 2.0, 'for gradient clipping')
 tf.app.flags.DEFINE_integer("max_infer_batch", None, "max infer batch when single_pass, None mean no limit")
 
+# num_gpus
+tf.app.flags.DEFINE_integer("gpus", 1, "max gpu nums, data parallel")
+
 # Pointer-generator or baseline model
 tf.app.flags.DEFINE_boolean('pointer_gen', True, 'If True, use pointer-generator model. If False, use baseline model.')
 
@@ -68,6 +72,9 @@ tf.app.flags.DEFINE_boolean('coverage', False, 'Use coverage mechanism. Note, th
 tf.app.flags.DEFINE_float('cov_loss_wt', 1.0, 'Weight of coverage loss (lambda in the paper). If zero, then no incentive to minimize coverage loss.')
 tf.app.flags.DEFINE_boolean('convert_to_coverage_model', False, 'Convert a non-coverage model to a coverage model. Turn this on and run in train mode. Your current model will be copied to a new version (same name with _cov_init appended) that will be ready to run with coverage flag turned on, for the coverage training stage.')
 
+gpus = min(FLAGS.gpus, len(util.get_available_gpus()))
+setattr(FLAGS, "gpus", gpus)
+tf.logging.info("will use {} gpus".format(gpus))
 
 def calc_running_avg_loss(loss, running_avg_loss, summary_writer, step, decay=0.99):
   """Calculate the running average loss via exponential decay.
@@ -139,6 +146,7 @@ def setup_training(model, batcher):
                    save_summaries_secs=60, # save summaries for tensorboard every 60 secs
                    save_model_secs=60, # checkpoint every 60 secs
                    global_step=model.global_step)
+
   summary_writer = sv.summary_writer
   tf.logging.info("Preparing or waiting for session...")
   sess_context_manager = sv.prepare_or_wait_for_session(config=util.get_config())

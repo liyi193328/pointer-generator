@@ -24,6 +24,8 @@ import codecs
 import glob
 import numpy as np
 import tensorflow as tf
+from tensorflow.python.client import device_lib
+
 FLAGS = tf.app.flags.FLAGS
 
 def get_dir_or_file_path(dir_or_path, max_deep=1):
@@ -86,6 +88,10 @@ def read_sum_sents(file_path,sent_token=False):
       sents = sents.split(" ")
     sum_sents.append(sents)
   return sum_sents
+
+def get_available_gpus():
+  local_device_protos = device_lib.list_local_devices()
+  return [x.name for x in local_device_protos if x.device_type == 'GPU']
 
 if __name__ == "__main__":
   print( cut_sentence(["我爱","中国","。","我爱","中国"]) )

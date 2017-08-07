@@ -79,7 +79,7 @@ class BeamSearchDecoder(object):
       self._decode_dir = os.path.join(FLAGS.log_root, "decode")
 
     # Make the decode dir if necessary
-    if not os.path.exists(self._decode_dir): os.mkdir(self._decode_dir)
+    if not os.path.exists(self._decode_dir): os.makedirs(self._decode_dir)
 
     if FLAGS.single_pass:
       # Make the dirs to contain output written in the correct format for pyrouge
@@ -158,15 +158,6 @@ class BeamSearchDecoder(object):
 
     # First, divide decoded output into sentences
     decoded_sents = []
-
-    # while len(decoded_words) > 0:
-      # try:
-      #   fst_period_idx = decoded_words.index(".")
-      # except ValueError: # there is text remaining that doesn't end in "."
-      #   fst_period_idx = len(decoded_words)
-      # sent = decoded_words[:fst_period_idx+1] # sentence up to and including the period
-      # decoded_words = decoded_words[fst_period_idx+1:] # everything else
-      # decoded_sents.append(' '.join(sent))
 
     if SentenceSplitter is None:
       decoded_sents = util.cut_sentence(decoded_words)

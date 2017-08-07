@@ -45,18 +45,6 @@ SENTENCE_START = '<s>'
 SENTENCE_END = '</s>'
 
 # These are the number of .story files we expect there to be in cnn_stories_dir and dm_stories_dir
-num_expected_cnn_stories = 92579
-num_expected_dm_stories = 219506
-
-all_train_urls = "url_lists/all_train.txt"
-all_val_urls = "url_lists/all_val.txt"
-all_test_urls = "url_lists/all_test.txt"
-
-cnn_tokenized_stories_dir = "cnn_stories_tokenized"
-dm_tokenized_stories_dir = "dm_stories_tokenized"
-finished_files_dir = "finished_files"
-chunks_dir = os.path.join(finished_files_dir, "chunked")
-
 
 def preprocess_abs_text(abs_text):
   i = 0
@@ -333,7 +321,7 @@ def cli():
 @click.argument("set_name")
 @click.option("--makevocab", is_flag=True)
 @click.option("--chunk_size", default=10000)
-def convert_parallel_text(path_or_dir, write_dir, set_name, makevocab=True, chunk_size=10000):
+def convert_parallel_text(path_or_dir, write_dir, set_name, makevocab=False, chunk_size=10000):
   assert  set_name in ["train", "val", "test"]
   from os.path import join
   paths = util.get_dir_or_file_path(path_or_dir)
