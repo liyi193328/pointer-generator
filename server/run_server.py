@@ -41,12 +41,14 @@ tf.app.flags.DEFINE_string('input_article', '', 'To summarize a single article g
 # Where to find data
 tf.app.flags.DEFINE_string('data_path', '',
                            'Path expression to tf.Example datafiles. Can include wildcards to access multiple datafiles.')
+tf.app.flags.DEFINE_string('infer_dir', None, 'infer result dir')
 tf.app.flags.DEFINE_string('vocab_path', '', 'Path expression to text vocabulary file.')
 
 # Important settings
 tf.app.flags.DEFINE_string('mode', 'train', 'must be one of train/eval/decode')
 tf.app.flags.DEFINE_boolean('single_pass', False,
                             'For decode mode only. If True, run eval on the full dataset using a fixed checkpoint, i.e. take the current checkpoint, and use it to produce one summary for each example in the dataset, write the summaries to file and then get ROUGE scores for the whole dataset. If False (default), run concurrent decoding, i.e. repeatedly load latest checkpoint, use it to produce summaries for randomly-chosen examples and log the results to screen, indefinitely.')
+tf.app.flags.DEFINE_boolean("Serving", True, "Serve for web[False]")
 
 # Where to save output
 tf.app.flags.DEFINE_string('log_root', '', 'Root directory for all logging.')
@@ -69,6 +71,7 @@ tf.app.flags.DEFINE_float('adagrad_init_acc', 0.1, 'initial accumulator value fo
 tf.app.flags.DEFINE_float('rand_unif_init_mag', 0.02, 'magnitude for lstm cells random uniform inititalization')
 tf.app.flags.DEFINE_float('trunc_norm_init_std', 1e-4, 'std of trunc norm init, used for initializing everything else')
 tf.app.flags.DEFINE_float('max_grad_norm', 2.0, 'for gradient clipping')
+tf.app.flags.DEFINE_integer("max_infer_batch", None, "max infer batch when single_pass, None mean no limit")
 
 # Pointer-generator or baseline model
 tf.app.flags.DEFINE_boolean('pointer_gen', True, 'If True, use pointer-generator model. If False, use baseline model.')
@@ -81,16 +84,16 @@ tf.app.flags.DEFINE_float('cov_loss_wt', 1.0,
 tf.app.flags.DEFINE_boolean('convert_to_coverage_model', False,
                             'Convert a non-coverage model to a coverage model. Turn this on and run in train mode. Your current model will be copied to a new version (same name with _cov_init appended) that will be ready to run with coverage flag turned on, for the coverage training stage.')
 
-with open('templates/fish_article.txt') as f:
+with open('server/templates/fish_article.txt') as f:
   default_article = f.read()
 
 
-def setup_summarizer(settings):
+def setup_summarizer():
   tf.logging.set_verbosity(tf.logging.INFO)  # choose what level of logging you want
   tf.logging.info('Starting seq2seq_attention ')
 
   # Change log_root to FLAGS.log_root/FLAGS.exp_name and create the dir if necessary
-  vocab = Vocab(settings.vocab_path, settings.vocab_size)  # create a vocabulary
+  vocab = Vocab(FLAGS.vocab_path, FLAGS.vocab_size)  # create a vocabulary
 
   # If in decode mode, set batch_size = beam_size
   # Reason: in decode mode, we decode one example at a time.
@@ -119,23 +122,7 @@ def setup_summarizer(settings):
   decoder = BeamSearchDecoder(model, None, vocab)
   return Summarizer(decoder, vocab=vocab, hps=hps)
 
-
-class Settings:
-  def __init__(self, vocab_path, vocab_size):
-    self.vocab_path = vocab_path
-    self.vocab_size = vocab_size
-
-
-parser = optparse.OptionParser()
-parser.add_option("-L", "--log_root", help="log root")
-parser.add_option("-V", "--vocab_path", help="vocab file")
-options, _ = parser.parse_args()
-
-FLAGS.log_root = options.log_root
-vocab_path = options.vocab_path
-FLAGS.mode = 'decode'
-settings = Settings(vocab_path=vocab_path, vocab_size=50000)
-summarizer = setup_summarizer(settings)
+summarizer = setup_summarizer()
 
 app = Flask(__name__)
 

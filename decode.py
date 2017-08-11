@@ -62,7 +62,7 @@ class BeamSearchDecoder(object):
     # Load an initial checkpoint to use for decoding
     ckpt_path = util.load_ckpt(self._saver, self._sess)
 
-    if FLAGS.single_pass:
+    if FLAGS.single_pass and FLAGS.Serving == False:
       # Make a descriptive decode directory name
       ckpt_name = "ckpt-" + ckpt_path.split('-')[-1] # this is something of the form "ckpt-123456"
       if FLAGS.infer_dir is None:
@@ -79,9 +79,10 @@ class BeamSearchDecoder(object):
       self._decode_dir = os.path.join(FLAGS.log_root, "decode")
 
     # Make the decode dir if necessary
-    if not os.path.exists(self._decode_dir): os.makedirs(self._decode_dir)
+    if not FLAGS.Serving:
+      if not os.path.exists(self._decode_dir): os.makedirs(self._decode_dir)
 
-    if FLAGS.single_pass:
+    if FLAGS.single_pass and FLAGS.Serving == False:
       # Make the dirs to contain output written in the correct format for pyrouge
       self._rouge_ref_path = os.path.join(self._decode_dir, "ref.txt")
       self._rouge_dec_path = os.path.join(self._decode_dir, "infer.txt")
@@ -135,6 +136,10 @@ class BeamSearchDecoder(object):
       except ValueError:
         decoded_words = decoded_words
       decoded_output = ' '.join(decoded_words) # single string
+
+      if input_batch is not None:  # Finish decoding given single example
+        print_results(article_withunks, abstract_withunks, decoded_output) # log output to screen
+        return decoded_output
 
       if FLAGS.single_pass:
         self.write_for_rouge(original_abstract_sents, decoded_words, counter, article=original_article) # write ref summary and decoded summary to file, to eval with pyrouge later

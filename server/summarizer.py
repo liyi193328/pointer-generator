@@ -1,8 +1,23 @@
-from nltk import word_tokenize
+#encoding=utf-8
 
 from batcher import Example, Batch
-minimum_summarization_length = 200
 
+import pyltp
+import os
+
+LTP_DATA_DIR = os.environ.get("LTP_DATA_DIR","/home/bigdata/software/LTP/ltp_data")
+cws_model_path = os.path.join(LTP_DATA_DIR, 'cws.model')
+
+from pyltp import Segmentor
+from pyltp import SentenceSplitter
+segmentor = Segmentor()  # 初始化实例
+segmentor.load(cws_model_path)  # 加载模型
+
+minimum_summarization_length = 4
+
+def word_tokenize(s):
+  tokens = segmentor.segment(s.encode("utf-8"))
+  return tokens
 
 class Summarizer():
   def __init__(self, decoder, vocab, hps):
