@@ -3,18 +3,10 @@
 import codecs
 import batcher
 import data
-
-bin_path = "/home/bigdata/active_project/run_tasks/text_sum/data/chunked/train_*"
+from collections import namedtuple
+bin_path = "/home/bigdata/active_project/run_tasks/query_rewrite/stable/stable_single/copy_data_format/chunked/train*"
 vocab_path = "/home/bigdata/active_project/run_tasks/text_sum/data/vocab/vocab.txt"
 data_generater = data.example_generator(bin_path, single_pass=True)
-
-# samples = 10
-# cnt = 0
-# for x in data_generater:
-#   print(x)
-#   cnt += 1
-#   if cnt >= samples:
-#     break
 
 
 def test_text(path):
@@ -24,13 +16,18 @@ def test_text(path):
   print(type(lines[0]))
 
 def test_batcher():
-  hps = {
-    "batch_size": 30
-  }
+  HPS = namedtuple("HPS", ["batch_size", "mode"])
+  hps = HPS(5, "train")
   bx = batcher.Batcher(bin_path,vocab_path,hps, single_pass=True)
   input_gen = bx.text_generator(data.example_generator(bx._data_path, bx._single_pass))
-  x = input_gen.next()
-  print(x)
+  cnt = 0
+  while True:
+    x = input_gen.next()
+    print(x[0].decode("utf-8"))
+    print(x[1].decode("utf-8"))
+    cnt += 1
+    if cnt > 10:
+      break
+
 if __name__ == "__main__":
-  # test_text("/home/bigdata/active_project/run_tasks/text_sum/data/bin/test.txt")
   test_batcher()

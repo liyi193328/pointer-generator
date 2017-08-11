@@ -148,7 +148,7 @@ def preprocess_abs_tokens(abs, article=None, max_substring_sents=1):
       return False
     sent_str = " ".join([SENTENCE_START, sent, SENTENCE_END])
     new_abs_list.append(sent_str)
-    pre_abs = " ".join(new_abs_list)
+  pre_abs = " ".join(new_abs_list)
 
   if isinstance(pre_abs, six.text_type) == False:
     pre_abs = pre_abs.decode("utf-8")
@@ -200,11 +200,6 @@ def filter_save_paris(lines, bin_path, text_path, abs_index=1, article_index=2,
 
   valid_samples = 0
   for i, line in enumerate(lines):
-
-    # Get the strings to write to .bin file
-    # article, abstract = get_article_abs(line)
-    # if article == False or abstract == False:
-    #   continue
 
     x = get_source_target_pairs(line, source_min_tokens=source_min_tokens, source_max_tokens=source_max_tokens,
                                   target_min_tokens=target_min_tokens, target_max_tokens=target_max_tokens)
@@ -309,6 +304,10 @@ def get_source_target_pairs(line, source_min_tokens=None, source_max_tokens=None
   target_ok = sentence_ok(target_str, target_min_tokens, target_max_tokens)
   if target_ok is False:
     return False
+
+  ##add </s> in source ,convert target to <s> target </s>
+  source_str = " ".join([source_str, SENTENCE_END])
+  target_str = " ".join([SENTENCE_START, target_str, SENTENCE_END])
   return [source_str, target_str]
 
 @click.group()
