@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}
+Cascades Summarizer
+{% endblock %}
+
+{% block content %}
+<article>
+    <header>
+        <h1>
+            Welcome to Cascades Summarizer
+        </h1>
+    </header>
+
+    <br>
+    <div style="background-color:beige;">
+        <h2>Summary</h2>
+        <p>{{summary}}</p>
+    </div>
+
+    <br>
+    <br>
+
+    <h1>Enter long article here</h1>
+    <h2>(This will be summarized)</h2>
+    <form action="." method="POST">
+        <textarea name="article" rows="40" cols="80"> {{article}}
+        </textarea>
+        <input type="submit" name="article-submit" value="Summarize">
+    </form>
+</article>
+{% endblock %}
+

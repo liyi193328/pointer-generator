@@ -26,6 +26,7 @@ from data import Vocab
 from batcher import Batcher
 from model import SummarizationModel
 from decode import BeamSearchDecoder
+from server import summarizer
 import util
 
 FLAGS = tf.app.flags.FLAGS
@@ -291,7 +292,13 @@ def main(unused_argv):
     decode_model_hps = hps._replace(max_dec_steps=1) # The model is configured with max_dec_steps=1 because we only ever run one step of the decoder at a time (to do beam search). Note that the batcher is initialized with max_dec_steps equal to e.g. 100 because the batches need to contain the full summaries
     model = SummarizationModel(decode_model_hps, vocab)
     decoder = BeamSearchDecoder(model, batcher, vocab)
-    decoder.decode() # decode indefinitely (unless single_pass=True, in which case deocde the dataset exactly once)
+    input_article = FLAGS.input_article  # Command line input single article to summarize
+    if input_article is not '':
+      sm = summarizer.Summarizer(decoder, vocab, hps)
+      single_batch = sm.article_to_batch(input_article)
+    else:
+      single_batch = None
+    decoder.decode(single_batch) # decode indefinitely (unless single_pass=True, in which case deocde the dataset exactly once)
   else:
     raise ValueError("The 'mode' flag must be one of train/eval/decode")
 
