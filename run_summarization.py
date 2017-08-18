@@ -118,22 +118,22 @@ def restore_best_model():
 
   # Initialize all vars in the model
   sess = tf.Session(config=util.get_config())
-  print "Initializing all variables..."
+  print ("Initializing all variables...")
   sess.run(tf.initialize_all_variables())
 
   # Restore the best model from eval dir
   saver = tf.train.Saver([v for v in tf.all_variables() if "Adagrad" not in v.name])
-  print "Restoring all non-adagrad variables from best model in eval dir..."
+  print ("Restoring all non-adagrad variables from best model in eval dir...")
   curr_ckpt = util.load_ckpt(saver, sess, "eval")
-  print "Restored %s." % curr_ckpt
+  print ("Restored %s." % curr_ckpt)
 
   # Save this model to train dir and quit
   new_model_name = curr_ckpt.split("/")[-1].replace("bestmodel", "model")
   new_fname = os.path.join(FLAGS.log_root, "train", new_model_name)
-  print "Saving model to %s..." % (new_fname)
+  print ("Saving model to %s..." % (new_fname))
   new_saver = tf.train.Saver() # this saver saves all variables that now exist, including Adagrad variables
   new_saver.save(sess, new_fname)
-  print "Saved."
+  print ("Saved.")
   exit()
 
 
