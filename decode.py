@@ -40,6 +40,41 @@ FLAGS = tf.app.flags.FLAGS
 
 SECS_UNTIL_NEW_CKPT = 60  # max number of seconds before loading new checkpoint
 
+def copy_model_post_fn(text, source_text=None):
+  """unique sentence end !!!! => !
+  :param line:
+  :return:
+  """
+  tokens = text.strip().split(" ")
+  source_tokens = source_text.split(" ")
+  source_token_cnt = {}
+  for token in source_tokens:
+    if token not in source_token_cnt:
+      source_token_cnt[token] = 0
+    source_token_cnt[token] += 1
+  commons = ["!", "?"]
+
+  if len(tokens) == 0:
+    return ""
+  else:
+    last_token = tokens[-1]
+    new_last_token = []
+    char_set = set()
+    for char in last_token:
+      if char not in new_last_token:
+        new_last_token.append(char)
+    new_last_token = "".join(new_last_token)
+    tokens[-1] = new_last_token
+
+    new_tokens = []
+    for i, token in enumerate(tokens):
+      if i > 0 and tokens[i] == tokens[i-1]:
+        if tokens[i] in commons:
+          continue
+        if tokens[i] not in source_token_cnt or source_token_cnt[tokens[i]] < 2:
+          continue
+      new_tokens.append(token)
+  return " ".join(new_tokens)
 
 class BeamSearchDecoder(object):
   """Beam search decoder."""
@@ -93,7 +128,7 @@ class BeamSearchDecoder(object):
 
       self._rouge_result_path = os.path.join(self._decode_dir, "rouge_result.log")
 
-  def decode(self, input_batch = None):
+  def decode(self, input_batch = None, beam_nums_to_return=1, *args,**kwargs):
     """Decode examples until data is exhausted (if FLAGS.single_pass) and return, or decode indefinitely, loading latest checkpoint at regular intervals"""
     t0 = time.time()
     counter = 0
@@ -122,38 +157,44 @@ class BeamSearchDecoder(object):
       article_withunks = data.show_art_oovs(original_article, self._vocab) # string
       abstract_withunks = data.show_abs_oovs(original_abstract, self._vocab, (batch.art_oovs[0] if FLAGS.pointer_gen else None)) # string
 
-      # Run beam search to get best Hypothesis
-      best_hyp = beam_search.run_beam_search(self._sess, self._model, self._vocab, batch)
+      # Run beam search to get {beam_nums_to_return} best Hypothesis
+      best_hyp_list = beam_search.run_beam_search(self._sess, self._model, self._vocab, batch, beam_nums_to_return=beam_nums_to_return)
 
-      # Extract the output ids from the hypothesis and convert back to words
-      output_ids = [int(t) for t in best_hyp.tokens[1:]]
-      decoded_words = data.outputids2words(output_ids, self._vocab, (batch.art_oovs[0] if FLAGS.pointer_gen else None))
+      decoded_output_list = []
 
-      # Remove the [STOP] token from decoded_words, if necessary
-      try:
-        fst_stop_idx = decoded_words.index(data.STOP_DECODING) # index of the (first) [STOP] symbol
-        decoded_words = decoded_words[:fst_stop_idx]
-      except ValueError:
-        decoded_words = decoded_words
-      decoded_output = ' '.join(decoded_words) # single string
+      for bx, best_hyp in enumerate(best_hyp_list):
+        # Extract the output ids from the hypothesis and convert back to words
+        output_ids = [int(t) for t in best_hyp.tokens[1:]]
+        decoded_words = data.outputids2words(output_ids, self._vocab, (batch.art_oovs[0] if FLAGS.pointer_gen else None))
+
+        # Remove the [STOP] token from decoded_words, if necessary
+        try:
+          fst_stop_idx = decoded_words.index(data.STOP_DECODING) # index of the (first) [STOP] symbol
+          decoded_words = decoded_words[:fst_stop_idx]
+        except ValueError:
+          decoded_words = decoded_words
+        decoded_output = ' '.join(decoded_words) # single string
+        decoded_output = copy_model_post_fn(decoded_output, source_text=original_article)
+        decoded_output_list.append(decoded_output)
 
       if input_batch is not None:  # Finish decoding given single example
-        print_results(article_withunks, abstract_withunks, decoded_output) # log output to screen
-        return decoded_output
+        print_results(article_withunks, abstract_withunks, decoded_output_list) # log output to screen
+        return decoded_output_list
 
-      if FLAGS.single_pass:
-        self.write_for_rouge(original_abstract_sents, decoded_words, counter, article=original_article) # write ref summary and decoded summary to file, to eval with pyrouge later
-        counter += 1 # this is how many examples we've decoded
-      else:
-        print_results(article_withunks, abstract_withunks, decoded_output) # log output to screen
-        self.write_for_attnvis(article_withunks, abstract_withunks, decoded_words, best_hyp.attn_dists, best_hyp.p_gens) # write info to .json file for visualization tool
+      for decoded_output, best_hyp in zip(decoded_output_list, best_hyp_list):
+        if FLAGS.single_pass:
+          self.write_for_rouge(original_abstract_sents, decoded_words, counter, article=original_article) # write ref summary and decoded summary to file, to eval with pyrouge later
+          counter += 1 # this is how many examples we've decoded
+        else:
+          print_results(article_withunks, abstract_withunks, decoded_output) # log output to screen
+          self.write_for_attnvis(article_withunks, abstract_withunks, decoded_words, best_hyp.attn_dists, best_hyp.p_gens) # write info to .json file for visualization tool
 
-        # Check if SECS_UNTIL_NEW_CKPT has elapsed; if so return so we can load a new checkpoint
-        t1 = time.time()
-        if t1-t0 > SECS_UNTIL_NEW_CKPT:
-          tf.logging.info('We\'ve been decoding with same checkpoint for %i seconds. Time to load new checkpoint', t1-t0)
-          _ = util.load_ckpt(self._saver, self._sess)
-          t0 = time.time()
+          # Check if SECS_UNTIL_NEW_CKPT has elapsed; if so return so we can load a new checkpoint
+          t1 = time.time()
+          if t1-t0 > SECS_UNTIL_NEW_CKPT:
+            tf.logging.info('We\'ve been decoding with same checkpoint for %i seconds. Time to load new checkpoint', t1-t0)
+            _ = util.load_ckpt(self._saver, self._sess)
+            t0 = time.time()
 
   def write_for_rouge(self, reference_sents, decoded_words, ex_index, article=None):
     """Write output to file in correct format for eval with pyrouge. This is called in single_pass mode.

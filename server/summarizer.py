@@ -30,7 +30,7 @@ class Summarizer():
       return input_article
     tokenized_article = ' '.join(word_tokenize(input_article))
     single_batch = self.article_to_batch(tokenized_article)
-    return self.decoder.decode(single_batch)  # decode indefinitely (unless single_pass=True, in
+    return self.decoder.decode(single_batch, beam_nums_to_return=10)  # decode indefinitely (unless single_pass=True, in
     # which case deocde the dataset exactly once)
 
   def article_to_batch(self, article):
