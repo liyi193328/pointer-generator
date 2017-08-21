@@ -2,16 +2,19 @@
 
 from batcher import Example, Batch
 
-import pyltp
+
 import os
 
 LTP_DATA_DIR = os.environ.get("LTP_DATA_DIR","/home/bigdata/software/LTP/ltp_data")
 cws_model_path = os.path.join(LTP_DATA_DIR, 'cws.model')
-
-from pyltp import Segmentor
-from pyltp import SentenceSplitter
-segmentor = Segmentor()  # 初始化实例
-segmentor.load(cws_model_path)  # 加载模型
+try:
+  import pyltp
+  from pyltp import Segmentor
+  from pyltp import SentenceSplitter
+  segmentor = Segmentor()  # 初始化实例
+  segmentor.load(cws_model_path)  # 加载模型
+except ImportError:
+  pass
 
 minimum_summarization_length = 4
 
