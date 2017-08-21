@@ -97,6 +97,9 @@ class BeamSearchDecoder(object):
     # Load an initial checkpoint to use for decoding
     ckpt_path = util.load_ckpt(self._saver, self._sess)
 
+    if batcher is None:
+      return
+
     if FLAGS.single_pass and FLAGS.Serving == False:
       # Make a descriptive decode directory name
       ckpt_name = "ckpt-" + ckpt_path.split('-')[-1] # this is something of the form "ckpt-123456"
