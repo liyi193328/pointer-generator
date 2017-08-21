@@ -344,7 +344,7 @@ def main(unused_argv):
     model = SummarizationModel(decode_model_hps, vocab)
     decoder = BeamSearchDecoder(model, batcher, vocab)
     sm = summarizer.Summarizer(decoder, vocab, hps)
-    if FLAGS.source_path is not None:
+    if FLAGS.infer_source_path is not None:
       tf.logging.info("make prediction for {}...".format(FLAGS.source_path))
       docs = codecs.open(FLAGS.infer_source_path, "r", "utf-8").readlines()
       if FLAGS.infer_save_path is None:
