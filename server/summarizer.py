@@ -16,7 +16,7 @@ try:
 except ImportError:
   pass
 
-minimum_summarization_length = 4
+minimum_summarization_length = 2
 
 def word_tokenize(s):
   tokens = segmentor.segment(s.encode("utf-8"))
@@ -28,10 +28,14 @@ class Summarizer():
     self.vocab = vocab
     self.hps = hps
 
-  def summarize(self, input_article):
-    if len(input_article) < minimum_summarization_length:
+  def summarize(self, input_article, tokenized=False):
+    if not tokenized:
+      tokenized_article = ' '.join(word_tokenize(input_article))
+    else:
+      tokenized_article = input_article
+    if len(tokenized_article.split(" ")) < minimum_summarization_length:
       return input_article
-    tokenized_article = ' '.join(word_tokenize(input_article))
+
     single_batch = self.article_to_batch(tokenized_article)
     return self.decoder.decode(single_batch, beam_nums_to_return=10)  # decode indefinitely (unless single_pass=True, in
     # which case deocde the dataset exactly once)

@@ -349,7 +349,7 @@ def main(unused_argv):
 
     if FLAGS.infer_source_path is not None:
       sm = summarizer.Summarizer(decoder, vocab, hps)
-      tf.logging.info("make prediction for {}...".format(FLAGS.source_path))
+      tf.logging.info("make prediction for {}...".format(FLAGS.infer_source_path))
       docs = codecs.open(FLAGS.infer_source_path, "r", "utf-8").readlines()
       if FLAGS.infer_save_path is None:
         fout = sys.stdout
