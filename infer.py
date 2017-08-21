@@ -17,7 +17,7 @@ def make_infer():
     fout = codecs.open(FLAGS.infer_save_path, "w", "utf-8")
   for i, source in enumerate(lines):
     source = source.strip()
-    decode_output_list = summarizer.summarize(source)
+    decode_output_list = summarizer.summarize(source, tokenized=True)
     fout.write(source + "\n")
     for i, decode_output in enumerate(decode_output_list):
       fout.write(decode_output.strip() + "\n")

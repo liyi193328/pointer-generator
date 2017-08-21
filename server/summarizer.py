@@ -4,8 +4,9 @@ from batcher import Example, Batch
 
 
 import os
-
-LTP_DATA_DIR = os.environ.get("LTP_DATA_DIR","/home/bigdata/software/LTP/ltp_data")
+USER_ROOT = os.path.expanduser("~")
+DEFAULT_LTP_DATA_DIR=os.path.join(USER_ROOT, "software/LTP/ltp_data")
+LTP_DATA_DIR = os.environ.get("LTP_DATA_DIR",DEFAULT_LTP_DATA_DIR)
 cws_model_path = os.path.join(LTP_DATA_DIR, 'cws.model')
 try:
   import pyltp
