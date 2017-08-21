@@ -342,9 +342,13 @@ def main(unused_argv):
     #the beam search use sess.run multiple times, fetch tensor value many times in decoding
     decode_model_hps = hps._replace(max_dec_steps=1) # The model is configured with max_dec_steps=1 because we only ever run one step of the decoder at a time (to do beam search). Note that the batcher is initialized with max_dec_steps equal to e.g. 100 because the batches need to contain the full summaries
     model = SummarizationModel(decode_model_hps, vocab)
+
+    if FLAGS.infer_source_path is not None or FLAGS.input_article is not None:
+      batcher = None
     decoder = BeamSearchDecoder(model, batcher, vocab)
-    sm = summarizer.Summarizer(decoder, vocab, hps)
+
     if FLAGS.infer_source_path is not None:
+      sm = summarizer.Summarizer(decoder, vocab, hps)
       tf.logging.info("make prediction for {}...".format(FLAGS.source_path))
       docs = codecs.open(FLAGS.infer_source_path, "r", "utf-8").readlines()
       if FLAGS.infer_save_path is None:
@@ -365,6 +369,7 @@ def main(unused_argv):
       single_batch = sm.article_to_batch(input_article)
     else:
       single_batch = None
+
     decoder.decode(single_batch) # decode indefinitely (unless single_pass=True, in which case deocde the dataset exactly once)
 
   else:
