@@ -78,7 +78,7 @@ class Hypothesis(object):
     return self.log_prob / len(self.tokens)
 
 
-def run_beam_search(sess, model, vocab, batch):
+def run_beam_search(sess, model, vocab, batch, beam_nums_to_return=1):
   """Performs beam search decoding on the given example.
 
   Args:
@@ -158,8 +158,13 @@ def run_beam_search(sess, model, vocab, batch):
   # Sort hypotheses by average log probability
   hyps_sorted = sort_hyps(results)
 
+  if beam_nums_to_return == 1:
+    return [ hyps_sorted[0] ]
+  else:
+    return hyps_sorted[0:beam_nums_to_return]
+
   # Return the hypothesis with highest average log prob
-  return hyps_sorted[0]
+  return hyps_sorted[0:beam_nums_to_return]
 
 def sort_hyps(hyps):
   """Return a list of Hypothesis objects, sorted by descending average log probability"""
