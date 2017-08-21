@@ -36,8 +36,6 @@ import run_summarization
 FLAGS = tf.app.flags.FLAGS
 from flask import render_template, request
 
-with open('server/templates/fish_article.txt') as f:
-  default_article = f.read()
 
 """
 python -m server.run_server --vocab_path=/home/bigdata/active_project/run_tasks/query_rewrite/stable/stable_single/copy_data_format/vocab/shared.vob.txt \
@@ -86,6 +84,8 @@ summarizer = setup_summarizer()
 
 if __name__ == "__main__":
 
+  with open('server/templates/fish_article.txt') as f:
+    default_article = f.read()
 
   app = Flask(__name__)
 
