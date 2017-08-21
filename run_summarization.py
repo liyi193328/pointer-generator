@@ -19,6 +19,7 @@
 import sys
 import time
 import os
+import codecs
 import tensorflow as tf
 import numpy as np
 from collections import namedtuple
@@ -40,8 +41,13 @@ tf.app.flags.DEFINE_string('vocab_path', '', 'Path expression to text vocabulary
 
 # Important settings
 tf.app.flags.DEFINE_string('mode', 'train', 'must be one of train/eval/decode')
-tf.app.flags.DEFINE_string('infer_dir', None, 'infer result dir')
 tf.app.flags.DEFINE_boolean('single_pass', False, 'For decode mode only. If True, run eval on the full dataset using a fixed checkpoint, i.e. take the current checkpoint, and use it to produce one summary for each example in the dataset, write the summaries to file and then get ROUGE scores for the whole dataset. If False (default), run concurrent decoding, i.e. repeatedly load latest checkpoint, use it to produce summaries for randomly-chosen examples and log the results to screen, indefinitely.')
+
+# Infer settings
+tf.app.flags.DEFINE_string('infer_dir', None, 'infer result dir')
+tf.app.flags.DEFINE_integer("max_infer_batch", None, "max infer batch when single_pass, None mean no limit")
+tf.app.flags.DEFINE_string("infer_source_path", None, "infer source path, make prediction for every line")
+tf.app.flags.DEFINE_string("infer_save_path", None, "infer from infer_source_path, save to infer_save_path")
 
 # Where to save output
 tf.app.flags.DEFINE_string('log_root', '', 'Root directory for all logging.')
@@ -63,7 +69,6 @@ tf.app.flags.DEFINE_float('adagrad_init_acc', 0.1, 'initial accumulator value fo
 tf.app.flags.DEFINE_float('rand_unif_init_mag', 0.02, 'magnitude for lstm cells random uniform inititalization')
 tf.app.flags.DEFINE_float('trunc_norm_init_std', 1e-4, 'std of trunc norm init, used for initializing everything else')
 tf.app.flags.DEFINE_float('max_grad_norm', 2.0, 'for gradient clipping')
-tf.app.flags.DEFINE_integer("max_infer_batch", None, "max infer batch when single_pass, None mean no limit")
 
 # num_gpus
 tf.app.flags.DEFINE_integer("gpus", 1, "max gpu nums, data parallel")
@@ -338,6 +343,22 @@ def main(unused_argv):
     decode_model_hps = hps._replace(max_dec_steps=1) # The model is configured with max_dec_steps=1 because we only ever run one step of the decoder at a time (to do beam search). Note that the batcher is initialized with max_dec_steps equal to e.g. 100 because the batches need to contain the full summaries
     model = SummarizationModel(decode_model_hps, vocab)
     decoder = BeamSearchDecoder(model, batcher, vocab)
+    sm = summarizer.Summarizer(decoder, vocab, hps)
+    if FLAGS.source_path is not None:
+      tf.logging.info("make prediction for {}...".format(FLAGS.source_path))
+      docs = codecs.open(FLAGS.infer_source_path, "r", "utf-8").readlines()
+      if FLAGS.infer_save_path is None:
+        fout = sys.stdout
+      else:
+        fout = codecs.open(FLAGS.infer_save_path, "w", "utf-8")
+      for doc in docs:
+        single_batch = sm.article_to_batch(doc)
+        example_decode_outputs = decoder.decode(single_batch, beam_nums_to_return=10)
+        fout.write(doc+"\n")
+        for i, decode_output in enumerate(example_decode_outputs):
+          fout.write(decode_output.strip() + "\n")
+        fout.write("\n")
+
     input_article = FLAGS.input_article  # Command line input single article to summarize
     if input_article is not '':
       sm = summarizer.Summarizer(decoder, vocab, hps)
@@ -345,6 +366,7 @@ def main(unused_argv):
     else:
       single_batch = None
     decoder.decode(single_batch) # decode indefinitely (unless single_pass=True, in which case deocde the dataset exactly once)
+
   else:
     raise ValueError("The 'mode' flag must be one of train/eval/decode")
 

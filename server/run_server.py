@@ -83,25 +83,28 @@ def setup_summarizer():
 
 summarizer = setup_summarizer()
 
-app = Flask(__name__)
+
+if __name__ == "__main__":
 
 
-@app.route('/')
-def index():
-  return render_template('index.html', summary='N/A', article=default_article)
+  app = Flask(__name__)
+
+  @app.route('/')
+  def index():
+    return render_template('index.html', summary='N/A', article=default_article)
 
 
-@app.route('/', methods=['POST'])
-def index_post():
-  article = request.form['article']
-  summarized_text_list = summarizer.summarize(article)
-  summarized_text = "\n".join(summarized_text_list)
-  return render_template('index.html', summary=summarized_text, article=article)
+  @app.route('/', methods=['POST'])
+  def index_post():
+    article = request.form['article']
+    summarized_text_list = summarizer.summarize(article)
+    summarized_text = "\n".join(summarized_text_list)
+    return render_template('index.html', summary=summarized_text, article=article)
 
 
-@app.route('/summarize/<text>')
-def summarize(text):
-  return summarizer.summarize(text)
+  @app.route('/summarize/<text>')
+  def summarize(text):
+    return summarizer.summarize(text)
 
 
-app.run(host='0.0.0.0')
+  app.run(host='0.0.0.0')
